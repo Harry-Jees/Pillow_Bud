@@ -1,0 +1,63 @@
+﻿name: pillow_bud
+description: Pillow Bud - Your emotional companion, always listening.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI & Icons
+  cupertino_icons: ^1.0.5
+  google_fonts: ^6.1.0
+  flutter_animate: ^4.3.0
+  
+  # State Management
+  riverpod: ^2.5.1
+  flutter_riverpod: ^2.5.1
+  
+  # Local Storage
+  shared_preferences: ^2.2.2
+  
+  # Utilities
+  intl: ^0.19.0
+  path_provider: ^2.1.1
+  uuid: ^4.0.0
+
+  # AI/ML Integration
+  flutter_gemma: ^0.0.1
+  background_downloader: ^9.5.4
+  dio: ^5.4.0
+  markdown: ^7.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  
+  fonts:
+    - family: Lora
+      fonts:
+        - asset: assets/fonts/Lora-Regular.ttf
+        - asset: assets/fonts/Lora-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Lora-SemiBold.ttf
+          weight: 600
+    
+    - family: DM Sans
+      fonts:
+        - asset: assets/fonts/DMSans-Regular.ttf
+        - asset: assets/fonts/DMSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/DMSans-SemiBold.ttf
+          weight: 600
+  
+  assets:
+    - assets/images/
