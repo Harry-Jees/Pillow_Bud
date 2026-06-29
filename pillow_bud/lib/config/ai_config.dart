@@ -22,7 +22,7 @@ class AIConfig {
   static const int repeatPenalty = 1;
 
   // Response timing (milliseconds)
-  static const int thinkingDelay = 500; // Simulate thinking
+  static const int thinkingDelay = 120; // Keep the interface feeling responsive
   static const int streamingDelay = 50; // Delay between tokens
 
   // Safety & Content Filtering

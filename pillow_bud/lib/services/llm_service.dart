@@ -2,33 +2,26 @@ import 'package:pillow_bud/config/ai_config.dart';
 import 'package:pillow_bud/services/emotion_detector.dart';
 import 'package:pillow_bud/services/system_prompt_generator.dart';
 import 'package:pillow_bud/services/crisis_detector.dart';
-import 'package:uuid/uuid.dart';
 
 class LLMService {
-  static final uuid = Uuid();
-
-  // Conversation history for context
+  /// Conversation history for context.
   final List<Map<String, String>> conversationHistory = [];
 
-  /// Get emotionally intelligent Bud response
+  /// Get emotionally intelligent Bud response.
   Future<String> getEmotionalBudResponse({
     required String userMessage,
     required String userName,
     required String personalityMode,
   }) async {
-    // Step 1: Detect emotion and intensity
     final analysis = EmotionDetector.analyze(userMessage);
     final detectedEmotion = analysis['emotion'] as String;
     final emotionIntensity = analysis['intensity'] as double;
 
-
-    // Step 2: Check for crisis
     if (CrisisDetector.detectCrisis(userMessage)) {
       return CrisisDetector.getCrisisResourceMessage();
     }
 
-    // Step 3: Generate emotionally intelligent system prompt
-    final systemPrompt = SystemPromptGenerator.generatePrompt(
+    SystemPromptGenerator.generatePrompt(
       userName: userName,
       personalityMode: personalityMode,
       detectedEmotion: detectedEmotion,
@@ -36,15 +29,12 @@ class LLMService {
       recentContext: _getRecentContext(),
     );
 
-    // Step 4: Get response (mock or real Llama)
     final response = await _generateResponse(
-      systemPrompt: systemPrompt,
-      userMessage: userMessage,
       detectedEmotion: detectedEmotion,
       emotionIntensity: emotionIntensity,
+      personalityMode: personalityMode,
     );
 
-    // Step 5: Store in conversation history
     conversationHistory.add({
       'role': 'user',
       'content': userMessage,
@@ -56,7 +46,6 @@ class LLMService {
       'content': response,
     });
 
-    // Keep conversation history to last 10 exchanges to save context
     if (conversationHistory.length > 20) {
       conversationHistory.removeRange(0, 2);
     }
@@ -64,110 +53,211 @@ class LLMService {
     return response;
   }
 
-  /// Generate response (currently mock, ready for real Llama)
+  /// Generate response (currently mock, ready for real Llama).
   Future<String> _generateResponse({
-    required String systemPrompt,
-    required String userMessage,
     required String detectedEmotion,
     required double emotionIntensity,
+    required String personalityMode,
   }) async {
-    // TODO: Replace with real Llama 3.2 1B when flutter_gemma is ready
-    // For now, return contextual mock responses
-
-    // Simulate thinking time
     await Future.delayed(
       Duration(milliseconds: AIConfig.thinkingDelay),
     );
 
-    return _getMockEmotionalResponse(
-      userMessage: userMessage,
+    final response = _getMockEmotionalResponse(
       emotion: detectedEmotion,
-      intensity: emotionIntensity,
+      personalityMode: personalityMode,
     );
+
+    return _sanitizeResponse(response);
   }
 
-  /// Mock emotionally intelligent responses (Phase 1)
+  /// Mock emotionally intelligent responses (Phase 1).
   String _getMockEmotionalResponse({
-    required String userMessage,
     required String emotion,
-    required double intensity,
+    required String personalityMode,
   }) {
-    final responses = <String, List<String>>{
-      'overwhelmed': [
-        'That sounds like a lot to carry right now. You\'re handling more than one person should have to.',
-        'When everything feels like too much, it helps to focus on just the next small step.',
-        'What you\'re feeling makes complete sense. This is genuinely overwhelming.',
-        'It\'s okay to feel this way when you\'re dealing with this much.',
-      ],
-      'anxious': [
-        'Anxiety can feel so real even when we\'re not sure what will happen. What worries you most right now?',
-        'That worry makes sense. Let me ask: what\'s actually happening right now, in this moment?',
-        'Anxiety can trick us into thinking something will go wrong. What does your gut tell you?',
-        'It\'s hard to sit with this uncertainty. But you\'re safe right now.',
-      ],
-      'sad': [
-        'Sadness is how we process loss and pain. Whatever you\'re grieving deserves to be felt.',
-        'That\'s worth feeling sad about. Tell me what you\'re missing or what hurts.',
-        'Sometimes sadness is the truest response to what\'s happening. That\'s okay.',
-        'You\'re allowed to sit with this sadness for as long as you need.',
-      ],
-      'lonely': [
-        'Loneliness is one of the hardest feelings. I\'m here, and you\'re not alone right now.',
-        'The fact that you feel lonely means you value connection. That\'s actually beautiful.',
-        'Who do you think you could reach out to? Even one person?',
-        'You matter, and your presence in the world matters. I see you.',
-      ],
-      'stressed': [
-        'That\'s stressful, and your stress is valid. What\'s the thing that feels most urgent right now?',
-        'When everything feels urgent, nothing is actually urgent. What can wait?',
-        'Stress is your system telling you something matters. What\'s important to you here?',
-        'You\'re dealing with a lot. What\'s one thing you could let go of or ask for help with?',
-      ],
-      'confused': [
-        'Confusion is okay. Let\'s untangle this together. What\'s the most confusing part?',
-        'You don\'t have to have all the answers right now. What\'s one thing you know for sure?',
-        'Tell me more about what\'s unclear. Sometimes talking it through helps.',
-        'It\'s normal to not know what to do. What would help you figure this out?',
-      ],
-      'hopeful': [
-        'That\'s wonderful. Hold onto that feeling. What changed for you?',
-        'Hope is powerful. What are you hopeful about?',
-        'I love that shift. Tell me more about what you\'re looking forward to.',
-        'You\'re moving toward something. Keep going.',
-      ],
-      'calm': [
-        'That peace is something to protect. What helped you get here?',
-        'Calm is rare and precious. Sit with it for a moment.',
-        'You found your center. What do you notice when you\'re this calm?',
-        'This quiet strength you\'re feeling—hold onto it.',
-      ],
-      'angry': [
-        'Your anger makes sense. What happened that made you feel this way?',
-        'Anger is often a sign that something important was violated. What is it?',
-        'Don\'t minimize your anger. It\'s telling you something matters.',
-        'I hear your frustration. What do you need right now?',
-      ],
-      'uncertain': [
-        'Uncertainty is uncomfortable but normal. What would help you sit with the not-knowing?',
-        'You don\'t have to decide everything right now. What\'s one small thing you do know?',
-        'The not-knowing is hard, but it\'s also where possibility lives.',
-        'What would help you accept this uncertainty, even if you can\'t resolve it?',
-      ],
-    };
+    final lead = _getLead(personalityMode);
+    final emotionResponse = _emotionResponseFor(
+      emotion: emotion,
+      personalityMode: personalityMode,
+    );
+    final followUp = _followUpFor(
+      emotion: emotion,
+      personalityMode: personalityMode,
+    );
 
-    // Get responses for detected emotion
-    final emotionResponses = responses[emotion] ?? responses['uncertain']!;
-
-    // Select response based on conversation history
-    final index = conversationHistory.length % emotionResponses.length;
-    return emotionResponses[index];
+    return '$lead $emotionResponse $followUp'.trim();
   }
 
-  /// Get recent conversation context for continuity
+  String _getLead(String personalityMode) {
+    switch (personalityMode) {
+      case 'gentle':
+        return 'That feels tender, and it deserves a careful response.';
+      case 'curious':
+        return 'There is a pattern here worth looking at more closely.';
+      case 'wise':
+        return 'This seems to be pointing toward something deeper than the surface detail.';
+      case 'balanced':
+      default:
+        return 'That makes sense, and we can work through it with care.';
+    }
+  }
+
+  String _followUpFor({
+    required String emotion,
+    required String personalityMode,
+  }) {
+    switch (personalityMode) {
+      case 'gentle':
+        return switch (emotion) {
+          'sad' => 'What part has been heaviest to carry?',
+          'lonely' => 'What kind of support would feel most reassuring right now?',
+          'anxious' => 'Would it help to slow down and look at one small piece?',
+          _ => 'What would feel most steady from here?',
+        };
+      case 'curious':
+        return switch (emotion) {
+          'confused' => 'What part feels hardest to make sense of?',
+          'uncertain' => 'What would make this feel a little more defined?',
+          'stressed' => 'What is asking for the most attention here?',
+          _ => 'What stands out most to you in this?',
+        };
+      case 'wise':
+        return switch (emotion) {
+          'overwhelmed' => 'What changes if we reduce this to one priority?',
+          'angry' => 'What value or boundary feels crossed here?',
+          'sad' => 'What do you think this feeling is trying to protect?',
+          _ => 'What perspective would help most right now?',
+        };
+      case 'balanced':
+      default:
+        return switch (emotion) {
+          'anxious' => 'What feels most true in this moment?',
+          'hopeful' => 'What shifted that made this feel possible?',
+          'calm' => 'What seems to be supporting this calm?',
+          _ => 'What would help most from here?',
+        };
+    }
+  }
+
+  String _emotionResponseFor({
+    required String emotion,
+    required String personalityMode,
+  }) {
+    switch (emotion) {
+      case 'overwhelmed':
+        return switch (personalityMode) {
+          'wise' => 'There is too much pressure in too many directions, and that naturally frays focus.',
+          'curious' => 'A lot is competing for your attention at once. Which piece is loudest?',
+          'gentle' => 'You are carrying more than feels reasonable, and that can be exhausting.',
+          _ => 'This is a lot to hold at once, especially when everything feels urgent.',
+        };
+      case 'anxious':
+        return switch (personalityMode) {
+          'wise' => 'Anxiety can blur the line between possibility and fact, so it helps to come back to what is actually here.',
+          'curious' => 'The worry is showing up clearly. What is the fear underneath it?',
+          'gentle' => 'That worry makes sense. You do not need to solve the whole thing right now.',
+          _ => 'That worry makes sense, and it may help to return to what is true right now.',
+        };
+      case 'sad':
+        return switch (personalityMode) {
+          'wise' => 'Sadness often points toward something meaningful that has been lost or changed.',
+          'curious' => 'There is a real ache here. What part hurts most?',
+          'gentle' => 'That sadness is real, and it does not need to be rushed.',
+          _ => 'This sounds painful, and it deserves to be treated with care.',
+        };
+      case 'lonely':
+        return switch (personalityMode) {
+          'wise' => 'Loneliness has a way of showing how deeply connection matters.',
+          'curious' => 'What kind of connection would feel most supportive right now?',
+          'gentle' => 'This feeling is understandable, and it can be heavy to sit with.',
+          _ => 'Loneliness can feel isolating, and we can stay with it together.',
+        };
+      case 'stressed':
+        return switch (personalityMode) {
+          'wise' => 'Stress often means something important needs attention, but not all of it needs attention at once.',
+          'curious' => 'What is the biggest source of pressure here?',
+          'gentle' => 'That is a real amount of pressure to be holding.',
+          _ => 'That sounds stressful, and it may help to sort what matters now from what can wait.',
+        };
+      case 'confused':
+        return switch (personalityMode) {
+          'wise' => 'Confusion can be the point where clarity is trying to form.',
+          'curious' => 'Let us untangle it. What part feels most unclear?',
+          'gentle' => 'It is okay to feel unsure while things are still taking shape.',
+          _ => 'It makes sense that this feels unclear. We can slow it down together.',
+        };
+      case 'hopeful':
+        return switch (personalityMode) {
+          'wise' => 'That hope matters. It can be a signal that something is changing.',
+          'curious' => 'What seems to be opening up for you?',
+          'gentle' => 'That is a meaningful shift, and it is good to notice it.',
+          _ => 'That is encouraging, and it may be worth leaning into.',
+        };
+      case 'calm':
+        return switch (personalityMode) {
+          'wise' => 'That calm is worth protecting; it often reflects something working well.',
+          'curious' => 'What seems to be supporting this sense of calm?',
+          'gentle' => 'That sounds steady and restorative.',
+          _ => 'That is a good place to pause and appreciate.',
+        };
+      case 'angry':
+        return switch (personalityMode) {
+          'wise' => 'Anger often signals that a boundary, value, or expectation has been crossed.',
+          'curious' => 'What feels most important underneath the anger?',
+          'gentle' => 'That anger makes sense, and it deserves space rather than judgment.',
+          _ => 'That sounds frustrating, and it may help to name what needs to change.',
+        };
+      case 'uncertain':
+        return switch (personalityMode) {
+          'wise' => 'Uncertainty is uncomfortable, but it also leaves room for clarity to emerge.',
+          'curious' => 'What part of the uncertainty matters most right now?',
+          'gentle' => 'It is okay not to know yet.',
+          _ => 'Not knowing can be difficult, and we can work with that carefully.',
+        };
+      default:
+        return switch (personalityMode) {
+          'wise' => 'We can look at this with a steady mind.',
+          'curious' => 'Tell me a little more so I can understand what is happening.',
+          'gentle' => 'We can stay with this together.',
+          _ => 'We can take this one step at a time.',
+        };
+    }
+  }
+
+  String _sanitizeResponse(String response) {
+    var cleaned = response.trim();
+
+    cleaned = cleaned.replaceFirst(
+      RegExp(r'^(bud|assistant|bot)\s*[:\-\u2013\u2014]\s*',
+          caseSensitive: false),
+      '',
+    );
+
+    cleaned = cleaned.replaceFirst(
+      RegExp(r'^(sure|of course|absolutely|certainly)\s*,?\s*',
+          caseSensitive: false),
+      '',
+    );
+
+    cleaned = cleaned.replaceFirst(
+      RegExp(r"^(i\s+(understand|hear you|see)|i['’]?m here to help|i can help)\s*,?\s*",
+          caseSensitive: false),
+      '',
+    );
+
+    cleaned = cleaned.replaceFirst(
+      RegExp(r'^[\-\u2013\u2014]\s*'),
+      '',
+    );
+
+    return cleaned.trim();
+  }
+
+  /// Get recent conversation context for continuity.
   String _getRecentContext() {
     if (conversationHistory.isEmpty) return '';
 
-    // Get last 4 exchanges (8 messages)
     final recent = conversationHistory
         .skip(
           conversationHistory.length > 8 ? conversationHistory.length - 8 : 0,
@@ -177,12 +267,12 @@ class LLMService {
     return recent.map((msg) => '${msg['role']}: ${msg['content']}').join('\n');
   }
 
-  /// Clear conversation history (for new session)
+  /// Clear conversation history.
   void clearHistory() {
     conversationHistory.clear();
   }
 
-  /// Get conversation history for saving
+  /// Get conversation history for saving.
   List<Map<String, String>> getHistory() {
     return List.from(conversationHistory);
   }

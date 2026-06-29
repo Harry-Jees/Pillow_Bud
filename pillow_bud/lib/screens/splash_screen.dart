@@ -26,8 +26,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _startSplash() async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    if (!mounted) return;
     setState(() => _visible = true);
     await Future.delayed(const Duration(seconds: 2));
     await _loadPersistentState();

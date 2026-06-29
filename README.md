@@ -106,7 +106,7 @@ Contributions are welcome! Please read CONTRIBUTING.md for details on how to hel
 - [ ] Integrate real Llama 3.2 1B model
 - [ ] Isar database for persistent storage
 - [ ] Advanced mood analytics
-- [ ] Meditation guides
+- [x] Meditation guides
 - [ ] Peer community features (optional, privacy-first)
 
 ---

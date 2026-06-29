@@ -3,7 +3,15 @@ import 'dart:math';
 /// Detects emotional states from text as defined in Part 6 of the Master Prompt.
 class EmotionDetector {
   static final Map<String, List<String>> _emotionKeywords = {
-    'overwhelmed': ['overwhelmed', 'too much', 'can\'t handle', 'drowning', 'everything at once', 'stressed out', 'can\'t cope'],
+    'overwhelmed': [
+      'overwhelmed',
+      'too much',
+      'can\'t handle',
+      'drowning',
+      'everything at once',
+      'stressed out',
+      'can\'t cope',
+    ],
     'anxious': ['anxious', 'nervous', 'worried', 'scared', 'afraid', 'panic', 'what if'],
     'sad': ['sad', 'depressed', 'down', 'empty', 'numb', 'lonely', 'hurts'],
     'lonely': ['alone', 'isolated', 'disconnected', 'left out', 'nobody', 'lonely'],
@@ -28,42 +36,44 @@ class EmotionDetector {
     'really': 1.2,
   };
 
-  /// Analyzes message to return a primary emotion and intensity (0.0 - 1.0)
+  /// Analyzes a message to return a primary emotion and intensity (0.0 - 1.0).
   static Map<String, dynamic> analyze(String message) {
-    final lowerMessage = message.toLowerCase();
+    final normalizedMessage = _normalize(message);
     String detectedEmotion = 'neutral';
-    double intensity = 0.5;
+    double baseIntensity = 0.0;
 
-    // 1. Detect Emotion
     int maxMatches = 0;
     _emotionKeywords.forEach((emotion, keywords) {
-      int matches = 0;
-      for (var keyword in keywords) {
-        if (lowerMessage.contains(keyword)) matches++;
+      var matches = 0;
+      for (final keyword in keywords) {
+        if (_containsTerm(normalizedMessage, keyword)) {
+          matches++;
+        }
       }
+
       if (matches > maxMatches) {
         maxMatches = matches;
         detectedEmotion = emotion;
+        baseIntensity = 0.3 + (matches * 0.1); // Start with a base and add per match
       }
     });
 
-    // 2. Calculate Intensity
-    double multiplier = 1.0;
+    var multiplier = 1.0;
     _intensityMarkers.forEach((marker, value) {
-      if (lowerMessage.contains(marker)) {
+      if (_containsTerm(normalizedMessage, marker)) {
         multiplier = max(multiplier, value);
       }
     });
 
-    intensity = (intensity * multiplier).clamp(0.0, 1.0);
+    final intensity = (baseIntensity * multiplier).clamp(0.1, 1.0);
 
     return {
       'emotion': detectedEmotion,
-      'intensity': intensity,
+      'intensity': maxMatches == 0 ? 0.5 : intensity, // If no emotion, return neutral intensity
     };
   }
 
-  /// Map emotions to recommended personality mode per spec 6.2
+  /// Maps emotions to recommended personality mode per spec 6.2.
   static String getRecommendedMode(String emotion) {
     switch (emotion) {
       case 'overwhelmed':
@@ -82,5 +92,33 @@ class EmotionDetector {
       default:
         return 'balanced';
     }
+  }
+
+  static String _normalize(String message) {
+    return message
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\u201C\u201D]'), '"')
+        .replaceAll(RegExp(r"[\u2018\u2019`]", unicode: true), "'")
+        .replaceAll(RegExp(r'[^a-z0-9\'\s]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  static bool _containsTerm(String text, String term) {
+    final normalizedTerm = term
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\u201C\u201D]'), '"')
+        .replaceAll(RegExp(r"[\u2018\u2019`]", unicode: true), "'")
+        .replaceAll(RegExp(r'[^a-z0-9\'\s]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (normalizedTerm.isEmpty) return false;
+
+    final pattern = RegExp(
+      r'(^|\s)' + RegExp.escape(normalizedTerm) + r'($|\s)',
+      caseSensitive: false,
+    );
+    return pattern.hasMatch(text);
   }
 }
