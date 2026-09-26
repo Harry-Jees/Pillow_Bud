@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -26,8 +27,8 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _biometricEnabled = false;
-  bool _biometricAvailable = false;
-  BiometricHardwareStatus _biometricHardwareStatus = BiometricHardwareStatus.notSupported;
+  BiometricHardwareStatus _biometricHardwareStatus =
+      BiometricHardwareStatus.notSupported;
   bool _notificationsEnabled = false;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 20, minute: 0);
   bool _isExporting = false;
@@ -47,8 +48,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (mounted) {
       setState(() {
         _biometricHardwareStatus = hwStatus;
-        _biometricAvailable = hwStatus != BiometricHardwareStatus.notSupported;
-        _biometricEnabled = biometricEnabled;
+                _biometricEnabled = biometricEnabled;
         _notificationsEnabled = notificationsEnabled;
         _reminderTime = reminderTime;
       });
@@ -134,7 +134,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const Text(
               'No Fingerprint, Face ID, or PIN passkey was detected on this device.\n\n'
               'To enable Biometric Lock for Pillow Bud:',
-              style: TextStyle(fontFamily: 'DM Sans', fontSize: 13, height: 1.4),
+              style:
+                  TextStyle(fontFamily: 'DM Sans', fontSize: 13, height: 1.4),
             ),
             const SizedBox(height: 12),
             Container(
@@ -146,10 +147,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('📱 Android: Settings → Security → Biometrics / Lock Screen',
+                  Text(
+                      '📱 Android: Settings → Security → Biometrics / Lock Screen',
                       style: TextStyle(fontFamily: 'DM Sans', fontSize: 12)),
                   SizedBox(height: 6),
-                  Text('🪟 Windows: Settings → Accounts → Sign-in options → Windows Hello / PIN',
+                  Text(
+                      '🪟 Windows: Settings → Accounts → Sign-in options → Windows Hello / PIN',
                       style: TextStyle(fontFamily: 'DM Sans', fontSize: 12)),
                   SizedBox(height: 6),
                   Text('🍎 iOS: Settings → Face ID & Passcode',
@@ -219,7 +222,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           );
         }
-        await BiometricService.authenticate(reason: 'Configure device security for Pillow Bud');
+        await BiometricService.authenticate(
+            reason: 'Configure device security for Pillow Bud');
         await _loadSettings();
         return;
       }
@@ -251,7 +255,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Notification permission denied. Enable it in Settings.'),
+              content: Text(
+                  'Notification permission denied. Enable it in Settings.'),
             ),
           );
         }
@@ -363,9 +368,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             fontFamily: 'Lora',
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: isDarkMode
-                ? const Color(0xFFECECF1)
-                : const Color(0xFF1A1225),
+            color:
+                isDarkMode ? const Color(0xFFECECF1) : const Color(0xFF1A1225),
           ),
         ),
         backgroundColor: Colors.transparent,
@@ -460,8 +464,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ValueListenableBuilder<ModelDownloadStatus>(
               valueListenable: ModelDownloadService.statusNotifier,
               builder: (context, status, _) {
-                final isDownloaded =
-                    status == ModelDownloadStatus.downloaded;
+                final isDownloaded = status == ModelDownloadStatus.downloaded;
 
                 return Container(
                   padding: const EdgeInsets.all(18),
@@ -493,9 +496,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               isDownloaded
                                   ? Icons.check_circle_rounded
                                   : Icons.memory_rounded,
-                              color: isDownloaded
-                                  ? AppColors.success
-                                  : primary,
+                              color: isDownloaded ? AppColors.success : primary,
                               size: 24,
                             ),
                           ),
@@ -517,8 +518,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 ValueListenableBuilder<String>(
-                                  valueListenable:
-                                      ModelDownloadService.statusMessageNotifier,
+                                  valueListenable: ModelDownloadService
+                                      .statusMessageNotifier,
                                   builder: (context, msg, _) {
                                     return Text(
                                       msg,
@@ -573,34 +574,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     ),
                                     Row(
                                       children: [
-                                        if (status == ModelDownloadStatus.downloading)
+                                        if (status ==
+                                            ModelDownloadStatus.downloading)
                                           ElevatedButton.icon(
                                             onPressed: _pauseModelDownload,
-                                            icon: const Icon(Icons.pause_rounded, size: 14),
-                                            label: const Text('Pause', style: TextStyle(fontSize: 12)),
+                                            icon: const Icon(
+                                                Icons.pause_rounded,
+                                                size: 14),
+                                            label: const Text('Pause',
+                                                style: TextStyle(fontSize: 12)),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.orange,
                                               foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10, vertical: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 6),
                                             ),
                                           )
                                         else
                                           ElevatedButton.icon(
                                             onPressed: _resumeModelDownload,
-                                            icon: const Icon(Icons.play_arrow_rounded, size: 14),
-                                            label: const Text('Resume', style: TextStyle(fontSize: 12)),
+                                            icon: const Icon(
+                                                Icons.play_arrow_rounded,
+                                                size: 14),
+                                            label: const Text('Resume',
+                                                style: TextStyle(fontSize: 12)),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: primary,
                                               foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10, vertical: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 6),
                                             ),
                                           ),
                                         const SizedBox(width: 6),
                                         TextButton(
-                                          onPressed:
-                                              ModelDownloadService.cancelDownload,
+                                          onPressed: ModelDownloadService
+                                              .cancelDownload,
                                           child: const Text('Cancel'),
                                         ),
                                       ],
@@ -619,16 +631,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               Expanded(
                                 child: ElevatedButton.icon(
                                   onPressed: _triggerModelDownload,
-                                  icon: const Icon(
-                                      Icons.download_rounded,
+                                  icon: const Icon(Icons.download_rounded,
                                       size: 18),
                                   label: const Text('Download Model (~700 MB)'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: primary,
-                                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                    foregroundColor:
+                                        Theme.of(context).colorScheme.onPrimary,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                 ),
@@ -641,15 +652,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       size: 18, color: AppColors.danger),
                                   label: const Text(
                                     'Reclaim Storage',
-                                    style: TextStyle(
-                                        color: AppColors.danger),
+                                    style: TextStyle(color: AppColors.danger),
                                   ),
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(
                                         color: AppColors.danger),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                 ),
@@ -734,7 +743,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: 28),
 
-            // 3b. Biometric Lock (Always visible on mobile/desktop)
+                        // 3b. Biometric Lock (Always visible on mobile/desktop)
             if (!kIsWeb) ...[
               Text(
                 'BIOMETRIC LOCK',
@@ -762,81 +771,90 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         : const Color(0x12000000),
                   ),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: _biometricEnabled
-                            ? AppColors.success.withValues(alpha: 0.15)
-                            : primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.fingerprint_rounded,
-                        color: _biometricEnabled ? AppColors.success : primary,
-                        size: 22,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _biometricEnabled
+                                ? AppColors.success.withValues(alpha: 0.15)
+                                : primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.fingerprint_rounded,
+                            color: _biometricEnabled ? AppColors.success : primary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Biometric / System Lock',
+                                style: TextStyle(
+                                  fontFamily: 'DM Sans',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDarkMode
+                                      ? const Color(0xFFECECF1)
+                                      : const Color(0xFF1A1225),
+                                ),
+                              ),
+                              Text(
+                                _biometricHardwareStatus ==
+                                        BiometricHardwareStatus.notEnrolled
+                                    ? '⚠️ Hardware available, but biometrics/PIN not set up in OS settings'
+                                    : 'Lock after 1.5 min of inactivity',
+                                style: TextStyle(
+                                  fontFamily: 'DM Sans',
+                                  fontSize: 11,
+                                  color: isDarkMode
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _biometricEnabled,
+                          activeThumbColor: AppColors.success,
+                          onChanged: _toggleBiometric,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Biometric / System Lock',
-                            style: TextStyle(
-                              fontFamily: 'DM Sans',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: isDarkMode
-                                  ? const Color(0xFFECECF1)
-                                  : const Color(0xFF1A1225),
+                    if (!_biometricEnabled ||
+                        _biometricHardwareStatus ==
+                            BiometricHardwareStatus.notEnrolled) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _showBiometricSetupDialog,
+                          icon: const Icon(Icons.settings_suggest_rounded,
+                              size: 18),
+                          label:
+                              const Text('Set Up / Configure System Passkey'),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          Text(
-                            _biometricHardwareStatus == BiometricHardwareStatus.notEnrolled
-                                ? '⚠️ Hardware available, but biometrics/PIN not set up in OS settings'
-                                : 'Lock after 1.5 min of inactivity',
-                            style: TextStyle(
-                              fontFamily: 'DM Sans',
-                              fontSize: 11,
-                              color: isDarkMode
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Switch(
-                      value: _biometricEnabled,
-                      activeThumbColor: AppColors.success,
-                      onChanged: _toggleBiometric,
-                    ),
-                  ],
-                ),
-                if (!_biometricEnabled || _biometricHardwareStatus == BiometricHardwareStatus.notEnrolled) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _showBiometricSetupDialog,
-                      icon: const Icon(Icons.settings_suggest_rounded, size: 18),
-                      label: const Text('Set Up / Configure System Passkey'),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: 28),
             ],
 
-            // 3c. Daily Notification
+// 3c. Daily Notification
             Text(
               'DAILY CHECK-IN',
               style: TextStyle(
@@ -1020,10 +1038,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       strokeWidth: 2, color: Colors.white),
                                 )
                               : const Icon(Icons.upload_rounded, size: 18),
-                          label: Text(_isExporting ? 'Exporting...' : 'Export Backup'),
+                          label: Text(
+                              _isExporting ? 'Exporting...' : 'Export Backup'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
-                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.onPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -1042,7 +1062,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       strokeWidth: 2, color: primary),
                                 )
                               : const Icon(Icons.download_rounded, size: 18),
-                          label: Text(_isImporting ? 'Importing...' : 'Import Backup'),
+                          label: Text(
+                              _isImporting ? 'Importing...' : 'Import Backup'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: primary,
                             side: BorderSide(color: primary),
@@ -1089,7 +1110,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 children: [
                   _buildPersonalityTile(
                     title: 'Balanced',
-                    subtitle: 'Harmonious blend of validation, inquiry, and wisdom',
+                    subtitle:
+                        'Harmonious blend of validation, inquiry, and wisdom',
                     mode: 'balanced',
                     currentMode: buddyPersonality,
                     primary: primary,
@@ -1098,7 +1120,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _buildDivider(isDarkMode),
                   _buildPersonalityTile(
                     title: 'Gentle',
-                    subtitle: 'Soft, reassuring, validating with minimal questions',
+                    subtitle:
+                        'Soft, reassuring, validating with minimal questions',
                     mode: 'gentle',
                     currentMode: buddyPersonality,
                     primary: primary,
@@ -1116,7 +1139,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _buildDivider(isDarkMode),
                   _buildPersonalityTile(
                     title: 'Wise',
-                    subtitle: 'Philosophical, thoughtful perspective without judgment',
+                    subtitle:
+                        'Philosophical, thoughtful perspective without judgment',
                     mode: 'wise',
                     currentMode: buddyPersonality,
                     primary: primary,
@@ -1309,9 +1333,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             : AppColors.textSecondaryLight,
                       ),
                     ),
-                    trailing: Icon(Icons.call_rounded, color: primary, size: 20),
+                    trailing:
+                        Icon(Icons.call_rounded, color: primary, size: 20),
                     onTap: () {
-                      _showResourceDialog(context, resource, isDarkMode, primary);
+                      _showResourceDialog(
+                          context, resource, isDarkMode, primary);
                     },
                   );
                 }).toList(),
@@ -1451,9 +1477,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: isDarkMode
-          ? const Color(0x14FFFFFF)
-          : const Color(0x0C000000),
+      color: isDarkMode ? const Color(0x14FFFFFF) : const Color(0x0C000000),
     );
   }
 
