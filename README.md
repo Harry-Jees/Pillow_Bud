@@ -2,7 +2,7 @@
 
 Your emotional companion, always listening.
 
-Pillow Bud is a free, open-source mental health support app that runs entirely on your phone. Built with Flutter and powered by Llama 3.2 1B AI.
+Pillow Bud is a free, open-source emotional wellness companion built with Flutter. It includes chat, journaling, mood tracking, breathing exercises, and crisis resources. The optional on-device language model downloads separately, so it does not inflate the app install package.
 
 ## Features
 
@@ -37,8 +37,9 @@ git clone https://github.com/yourusername/pillow-bud.git
 cd pillow-bud
 ```
 
-2. Install dependencies:
+2. Enter the Flutter app directory and install dependencies:
 ```bash
+cd pillow_bud
 flutter pub get
 ```
 
@@ -55,14 +56,16 @@ flutter run
 2. Enter your name and choose Bud's personality
 3. Start chatting!
 
-On first launch, Bud will download the AI model (~700 MB). This only happens once.
+The local AI model is downloaded on demand from the profile screen. It is a large download and needs additional free storage.
 
 ## Building
 
 ### Android
 ```bash
-flutter build apk --release
+flutter build apk --release --split-per-abi
 ```
+
+This creates a smaller APK for each Android CPU architecture under `pillow_bud/build/app/outputs/flutter-apk/`. Install the APK matching the device. The release build also shrinks code and resources.
 
 ### iOS
 ```bash

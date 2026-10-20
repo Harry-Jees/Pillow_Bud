@@ -95,7 +95,6 @@ flutter:
   
   assets:
     - assets/images/
-    - assets/secrets.json
 
 dependency_overrides:
   sqlite3: 2.4.6

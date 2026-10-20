@@ -1,12 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:pillow_bud/services/ai/ai_provider_config.dart';
 import 'package:pillow_bud/services/ai/local_llm_engine.dart';
 
 enum ModelDownloadStatus {
@@ -113,24 +110,7 @@ class ModelDownloadService {
       existingLength = await tempFile.length();
     }
 
-    // Load secret token from bundled assets if present
     final headers = <String, String>{};
-    try {
-      final secretJson = await rootBundle.loadString('assets/secrets.json');
-      final Map<String, dynamic> secretMap =
-          jsonDecode(secretJson) as Map<String, dynamic>;
-      String? token;
-      if (AIProviderConfig.activeProvider == AIProviderType.huggingFace) {
-        token = secretMap['huggingface_token'] as String?;
-      } else if (AIProviderConfig.activeProvider == AIProviderType.nvidiaBuild) {
-        token = secretMap['nvidia_api_key'] as String?;
-      }
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-    } catch (e) {
-      debugPrint('Failed to load secret token: $e');
-    }
 
     if (existingLength > 0) {
       headers['Range'] = 'bytes=$existingLength-';

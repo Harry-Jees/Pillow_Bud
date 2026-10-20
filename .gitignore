@@ -6,6 +6,10 @@
 .pub/
 pubspec.lock
 build/
+*.apk
+.gradle*/
+.gradle-user/
+**/.kotlin/
 
 # IDE
 .idea/
