@@ -201,10 +201,18 @@ class DatabaseService {
         ivBase64: row['iv'] as String,
       );
 
+      final moodIv = row['mood_iv'] as String?;
+      final mood = moodIv == null || moodIv.isEmpty
+          ? row['mood'] as String
+          : await EncryptionService.decrypt(
+              ciphertext: row['mood'] as String,
+              ivBase64: moodIv,
+            );
+
       entries.add(JournalEntry(
         id: row['id'] as String,
         text: text,
-        mood: row['mood'] as String,
+        mood: mood,
         dateCreated: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
         dateModified: DateTime.fromMillisecondsSinceEpoch(row['modified_at'] as int),
       ));
