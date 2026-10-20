@@ -29,8 +29,8 @@ This is local inference, not a hosted model API. Model downloads contact Hugging
 - New database text records use AES-256-CBC plus HMAC-SHA256 encrypt-then-MAC authentication. The IV field stores `base64(iv).hex(mac)`.
 - Existing IV-only records are supported for compatibility but are unauthenticated. Add a carefully tested migration before removing this compatibility path.
 - New mood labels are encrypted in database writes; legacy labels may remain plaintext until rewritten.
-- `StorageService` currently persists some app state and serialized chat/journal content in SharedPreferences. That is a known privacy debt.
-- Backup export is Base64-encoded JSON, not encryption. Do not store or share exports as though they were protected.
+- `StorageService` stores ordinary preferences in SharedPreferences and encrypts serialized chat/journal payloads before saving them there. Legacy plaintext payloads are re-encrypted when read. This duplicate persistence path should eventually be consolidated.
+- Backup export is Base64-encoded JSON, not encryption. New backups include a key fingerprint and are only restorable with the same installation key. Portable passphrase-protected backups remain outstanding.
 
 ## Platform support
 
