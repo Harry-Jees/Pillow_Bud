@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pillow_bud/models/chat_message.dart';
 import 'package:pillow_bud/models/journal_entry.dart';
+import 'package:pillow_bud/services/encryption/encryption_service.dart';
 
 class StorageService {
   static late SharedPreferences _prefs;
@@ -11,6 +12,7 @@ class StorageService {
   static Future<void> init() async {
     if (_initialized) return;
     _prefs = await SharedPreferences.getInstance();
+    await EncryptionService.initialize();
     _initialized = true;
   }
 
@@ -95,7 +97,12 @@ class StorageService {
   static Future<void> saveChatMessages(List<ChatMessage> messages) async {
     _ensureInitialized();
     final payload = jsonEncode(messages.map((e) => e.toJson()).toList());
-    await _prefs.setString('chatMessages', payload);
+    final encrypted = EncryptionService.encryptSync(payload);
+    await _prefs.setString('chatMessages', jsonEncode({
+      'version': 1,
+      'ciphertext': encrypted['ciphertext'],
+      'iv': encrypted['iv'],
+    }));
   }
 
   static List<ChatMessage> getChatMessages() {
@@ -104,8 +111,27 @@ class StorageService {
     if (jsonString == null || jsonString.isEmpty) return [];
 
     try {
-      final decoded = jsonDecode(jsonString) as List<dynamic>;
-      return decoded
+      final decoded = jsonDecode(jsonString);
+      String payload;
+      if (decoded is Map<String, dynamic> && decoded['version'] == 1) {
+        payload = EncryptionService.decryptSync(
+          ciphertext: decoded['ciphertext'] as String,
+          ivBase64: decoded['iv'] as String,
+        );
+      } else if (decoded is List<dynamic>) {
+        // Migrate legacy plaintext preferences to authenticated ciphertext.
+        payload = jsonString;
+        final encrypted = EncryptionService.encryptSync(payload);
+        _prefs.setString('chatMessages', jsonEncode({
+          'version': 1,
+          'ciphertext': encrypted['ciphertext'],
+          'iv': encrypted['iv'],
+        }));
+      } else {
+        throw const FormatException('Unsupported stored chat format.');
+      }
+      final messages = jsonDecode(payload) as List<dynamic>;
+      return messages
           .map((item) => ChatMessage.fromJson(item as Map<String, dynamic>))
           .toList();
     } catch (_) {
@@ -117,7 +143,12 @@ class StorageService {
   static Future<void> saveJournalEntries(List<JournalEntry> entries) async {
     _ensureInitialized();
     final payload = jsonEncode(entries.map((e) => e.toJson()).toList());
-    await _prefs.setString('journalEntries', payload);
+    final encrypted = EncryptionService.encryptSync(payload);
+    await _prefs.setString('journalEntries', jsonEncode({
+      'version': 1,
+      'ciphertext': encrypted['ciphertext'],
+      'iv': encrypted['iv'],
+    }));
   }
 
   static List<JournalEntry> getJournalEntries() {
@@ -126,8 +157,27 @@ class StorageService {
     if (jsonString == null || jsonString.isEmpty) return [];
 
     try {
-      final decoded = jsonDecode(jsonString) as List<dynamic>;
-      return decoded
+      final decoded = jsonDecode(jsonString);
+      String payload;
+      if (decoded is Map<String, dynamic> && decoded['version'] == 1) {
+        payload = EncryptionService.decryptSync(
+          ciphertext: decoded['ciphertext'] as String,
+          ivBase64: decoded['iv'] as String,
+        );
+      } else if (decoded is List<dynamic>) {
+        // Migrate legacy plaintext preferences to authenticated ciphertext.
+        payload = jsonString;
+        final encrypted = EncryptionService.encryptSync(payload);
+        _prefs.setString('journalEntries', jsonEncode({
+          'version': 1,
+          'ciphertext': encrypted['ciphertext'],
+          'iv': encrypted['iv'],
+        }));
+      } else {
+        throw const FormatException('Unsupported stored journal format.');
+      }
+      final entries = jsonDecode(payload) as List<dynamic>;
+      return entries
           .map((item) => JournalEntry.fromJson(item as Map<String, dynamic>))
           .toList();
     } catch (_) {
