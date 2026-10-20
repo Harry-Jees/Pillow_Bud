@@ -14,6 +14,11 @@ class EncryptionService {
   static enc.Encrypter? _encrypter;
   static List<int>? _macKey;
 
+  /// Loads the OS-stored key before any synchronous encrypted preference access.
+  static Future<void> initialize() async {
+    await _getEncrypter();
+  }
+
   static Future<enc.Encrypter> _getEncrypter() async {
     if (_encrypter != null) return _encrypter!;
 
@@ -43,9 +48,17 @@ class EncryptionService {
 
   /// Encrypts text and returns a Base64 ciphertext and authenticated IV value.
   static Future<Map<String, String>> encrypt(String plainText) async {
-    if (plainText.isEmpty) return {'ciphertext': '', 'iv': ''};
+    await _getEncrypter();
+    return encryptSync(plainText);
+  }
 
-    final encrypter = await _getEncrypter();
+  /// Synchronous encryption for already-initialized local preference storage.
+  static Map<String, String> encryptSync(String plainText) {
+    if (plainText.isEmpty) return {'ciphertext': '', 'iv': ''};
+    final encrypter = _encrypter;
+    if (encrypter == null || _macKey == null) {
+      throw StateError('EncryptionService.initialize() must run first.');
+    }
     final iv = enc.IV.fromSecureRandom(16);
     final ciphertext = encrypter.encrypt(plainText, iv: iv).base64;
     final ivBase64 = iv.base64;
@@ -53,6 +66,35 @@ class EncryptionService {
       'ciphertext': ciphertext,
       'iv': '$ivBase64.${_macFor(ivBase64, ciphertext)}',
     };
+  }
+
+  /// Synchronous authenticated decryption for already-initialized local storage.
+  static String decryptSync({
+    required String ciphertext,
+    required String ivBase64,
+  }) {
+    if (ciphertext.isEmpty) return '';
+    final encrypter = _encrypter;
+    if (encrypter == null || _macKey == null) {
+      throw StateError('EncryptionService.initialize() must run first.');
+    }
+    final separator = ivBase64.indexOf('.');
+    if (separator < 0) {
+      throw const FormatException('Unauthenticated encrypted record is not accepted here.');
+    }
+    final iv = ivBase64.substring(0, separator);
+    final suppliedMac = ivBase64.substring(separator + 1);
+    if (!_constantTimeEquals(suppliedMac, _macFor(iv, ciphertext))) {
+      throw const FormatException('Encrypted record authentication failed.');
+    }
+    try {
+      return encrypter.decrypt(
+        enc.Encrypted.fromBase64(ciphertext),
+        iv: enc.IV.fromBase64(iv),
+      );
+    } catch (_) {
+      throw const FormatException('Encrypted record is invalid or corrupted.');
+    }
   }
 
   /// Decrypts and authenticates a record. Corrupt/tampered data fails closed.
