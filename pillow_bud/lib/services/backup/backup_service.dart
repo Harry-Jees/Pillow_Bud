@@ -1,16 +1,18 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
+import 'package:pillow_bud/services/encryption/secure_key_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pillow_bud/services/database/database_service.dart';
 
 /// Handles AES-256 encrypted export and import of all Pillow Bud data.
 ///
-/// Export format: `PBv1:<base64(JSON)>`
+/// Export format: `PBv2:<base64(JSON)>`. This is encoding, not file encryption.
 /// The JSON payload contains raw encrypted SQLite rows (ciphertext + iv pairs)
 /// so messages are never decrypted during export – they travel as already-encrypted blobs.
 class BackupService {
-  static const _magic = 'PBv1:';
+  static const _magic = 'PBv2:';
 
   // ──────────────────────────────────────────────────────────
   //  EXPORT
@@ -23,19 +25,22 @@ class BackupService {
     // 1. Fetch raw (already-encrypted) rows – no decryption needed.
     final chatRows = await DatabaseService.getRawChatMessageRows();
     final journalRows = await DatabaseService.getRawJournalEntryRows();
-    final moodRows = await DatabaseService.getMoodHistory();
+    final moodRows = await DatabaseService.getRawMoodRows();
+    final masterKey = await SecureKeyStorage.getOrCreateMasterKey();
+    final keyFingerprint = sha256.convert(utf8.encode(masterKey)).toString();
 
     // 2. Bundle into one JSON payload.
     final payload = jsonEncode({
-      'version': 1,
+      'version': 2,
+      'key_fingerprint': keyFingerprint,
       'exported_at': DateTime.now().toIso8601String(),
       'chat_messages': chatRows,
       'journal_entries': journalRows,
       'mood_logs': moodRows,
     });
 
-    // 3. Base64-encode the JSON (lightweight, no extra crypto layer needed –
-    //    the individual rows already carry AES-256 ciphertext + iv).
+    // Base64 is not encryption. Record payloads remain encrypted, but metadata
+    // is visible; the UI warns users before exporting.
     final encoded = base64Encode(utf8.encode(payload));
 
     // 4. Write with magic header to a uniquely named file.
@@ -74,8 +79,20 @@ class BackupService {
     }
 
     final version = data['version'] as int? ?? 0;
-    if (version != 1) {
-      throw FormatException('Unsupported backup version: $version');
+    if (version != 2) {
+      throw FormatException(
+        'Unsupported or legacy backup version: $version. '
+        'Create a new backup with the current app before restoring.',
+      );
+    }
+
+    final masterKey = await SecureKeyStorage.getOrCreateMasterKey();
+    final expectedFingerprint = sha256.convert(utf8.encode(masterKey)).toString();
+    if (data['key_fingerprint'] != expectedFingerprint) {
+      throw const FormatException(
+        'This backup was created with a different installation key and cannot '
+        'be restored here. Portable passphrase-protected backups are not yet supported.',
+      );
     }
 
     int chats = 0, journals = 0, moods = 0;
