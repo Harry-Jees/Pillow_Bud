@@ -105,6 +105,7 @@ class DatabaseService {
   static Future<void> saveChatMessage(ChatMessage message, {String? mood, double? intensity}) async {
     if (!isInitialized) return;
     final encrypted = await EncryptionService.encrypt(message.text);
+    final encryptedMood = mood == null ? null : await EncryptionService.encrypt(mood);
 
     await _db!.insert(
       'chat_messages',
@@ -115,7 +116,8 @@ class DatabaseService {
         'ciphertext': encrypted['ciphertext']!,
         'iv': encrypted['iv']!,
         'timestamp': message.timestamp.millisecondsSinceEpoch,
-        'mood': mood,
+        'mood': encryptedMood?['ciphertext'],
+        'mood_iv': encryptedMood?['iv'],
         'intensity': intensity,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -170,6 +172,7 @@ class DatabaseService {
   static Future<void> saveJournalEntry(JournalEntry entry) async {
     if (!isInitialized) return;
     final encrypted = await EncryptionService.encrypt(entry.text);
+    final encryptedMood = await EncryptionService.encrypt(entry.mood);
 
     await _db!.insert(
       'journal_entries',
@@ -177,7 +180,8 @@ class DatabaseService {
         'id': entry.id,
         'ciphertext': encrypted['ciphertext']!,
         'iv': encrypted['iv']!,
-        'mood': entry.mood,
+        'mood': encryptedMood['ciphertext'],
+        'mood_iv': encryptedMood['iv'],
         'created_at': entry.dateCreated.millisecondsSinceEpoch,
         'modified_at': entry.dateModified.millisecondsSinceEpoch,
       },
@@ -247,12 +251,14 @@ class DatabaseService {
   static Future<void> logMood(String mood, {String? note}) async {
     if (!isInitialized) return;
     final encrypted = note != null && note.isNotEmpty ? await EncryptionService.encrypt(note) : null;
+    final encryptedMood = await EncryptionService.encrypt(mood);
 
     await _db!.insert(
       'mood_logs',
       {
         'id': DateTime.now().microsecondsSinceEpoch.toString(),
-        'mood': mood,
+        'mood': encryptedMood['ciphertext'],
+        'mood_iv': encryptedMood['iv'],
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'note_ciphertext': encrypted?['ciphertext'],
         'iv': encrypted?['iv'],
@@ -263,7 +269,21 @@ class DatabaseService {
 
   static Future<List<Map<String, dynamic>>> getMoodHistory() async {
     if (!isInitialized) return [];
-    return await _db!.query('mood_logs', orderBy: 'timestamp DESC', limit: 30);
+    final rows = await _db!.query('mood_logs', orderBy: 'timestamp DESC', limit: 30);
+    final result = <Map<String, dynamic>>[];
+    for (final source in rows) {
+      final row = Map<String, dynamic>.from(source);
+      final moodIv = row['mood_iv'] as String?;
+      // Rows created before schema v2 stored mood labels in plaintext.
+      if (moodIv != null && moodIv.isNotEmpty) {
+        row['mood'] = await EncryptionService.decrypt(
+          ciphertext: row['mood'] as String,
+          ivBase64: moodIv,
+        );
+      }
+      result.add(row);
+    }
+    return result;
   }
 
   // ==================== RAW-ROW HELPERS (for BackupService) ====================
