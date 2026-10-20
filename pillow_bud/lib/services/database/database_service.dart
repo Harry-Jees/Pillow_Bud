@@ -28,11 +28,13 @@ class DatabaseService {
 
       _db = await openDatabase(
         dbPath,
-        version: 1,
+        version: 2,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       );
-    } catch (e) {
-      debugPrint('DatabaseService initialization warning: $e');
+    } catch (e, stackTrace) {
+      debugPrint('DatabaseService initialization failed: $e');
+      Error.throwWithStackTrace(e, stackTrace);
     }
   }
 
@@ -49,6 +51,7 @@ class DatabaseService {
         iv TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
         mood TEXT,
+        mood_iv TEXT,
         intensity REAL
       )
     ''');
@@ -60,6 +63,7 @@ class DatabaseService {
         ciphertext TEXT NOT NULL,
         iv TEXT NOT NULL,
         mood TEXT NOT NULL,
+        mood_iv TEXT,
         created_at INTEGER NOT NULL,
         modified_at INTEGER NOT NULL
       )
@@ -80,11 +84,20 @@ class DatabaseService {
       CREATE TABLE IF NOT EXISTS mood_logs (
         id TEXT PRIMARY KEY,
         mood TEXT NOT NULL,
+        mood_iv TEXT,
         timestamp INTEGER NOT NULL,
         note_ciphertext TEXT,
         iv TEXT
       )
     ''');
+  }
+
+  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE chat_messages ADD COLUMN mood_iv TEXT');
+      await db.execute('ALTER TABLE journal_entries ADD COLUMN mood_iv TEXT');
+      await db.execute('ALTER TABLE mood_logs ADD COLUMN mood_iv TEXT');
+    }
   }
 
   // ==================== CHAT MESSAGES ====================
