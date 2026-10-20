@@ -308,6 +308,12 @@ class DatabaseService {
     return await _db!.query('journal_entries', orderBy: 'created_at DESC');
   }
 
+  /// Returns raw mood rows so exports never replace encrypted labels with plaintext.
+  static Future<List<Map<String, dynamic>>> getRawMoodRows() async {
+    if (!isInitialized) return [];
+    return await _db!.query('mood_logs', orderBy: 'timestamp DESC');
+  }
+
   /// Generic INSERT OR REPLACE – used by BackupService during import to restore
   /// already-encrypted rows without re-encrypting them.
   static Future<void> insertRawRow({
