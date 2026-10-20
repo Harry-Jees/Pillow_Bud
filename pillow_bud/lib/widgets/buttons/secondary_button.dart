@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pillow_bud/theme/app_colors.dart';
 
 class SecondaryButton extends StatelessWidget {
   final String label;
@@ -18,8 +17,8 @@ class SecondaryButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.primary,
-        side: const BorderSide(color: AppColors.primary),
+        foregroundColor: Theme.of(context).colorScheme.primary,
+        side: BorderSide(color: Theme.of(context).colorScheme.primary),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         minimumSize: Size(width ?? 0, 50),

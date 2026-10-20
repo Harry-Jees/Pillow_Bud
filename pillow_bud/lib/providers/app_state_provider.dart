@@ -19,14 +19,16 @@ final chatMessagesProvider = StateProvider<List<ChatMessage>>((ref) => []);
 
 final isLoadingChatProvider = StateProvider<bool>((ref) => false);
 
-final currentChatIdProvider = StateProvider<String>((ref) => '');
+final currentChatIdProvider = StateProvider<String>((ref) => 'default_session');
+
+final currentChatEmotionProvider = StateProvider<String>((ref) => '');
 
 // Journal State
 final journalEntriesProvider = StateProvider<List<JournalEntry>>((ref) => []);
 
-// UI State
+// UI & App State
 final isDarkModeProvider = StateProvider<bool>((ref) => true);
 
-final isModelLoadingProvider = StateProvider<bool>((ref) => true);
+final isModelLoadingProvider = StateProvider<bool>((ref) => false);
 
-final modelLoadingProgressProvider = StateProvider<double>((ref) => 0.0);
+final modelLoadingProgressProvider = StateProvider<double>((ref) => 1.0);

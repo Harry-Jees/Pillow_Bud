@@ -1,14 +1,19 @@
 import 'package:pillow_bud/config/constants.dart';
 
+/// Detects crisis markers and provides immediate emergency support resources
 class CrisisDetector {
-  static const List<String> _localTriggers = [
+  static const List<String> _crisisTriggers = [
     'suicide',
     'kill myself',
     'end my life',
     'want to die',
     'don\'t want to be here',
+    'dont want to be here',
+    'don\'t want to live',
+    'dont want to live',
     'hurt myself',
     'self-harm',
+    'self harm',
     'cutting',
     'overdose',
     'better off dead',
@@ -17,6 +22,10 @@ class CrisisDetector {
     'giving up',
     'goodbye everyone',
     'can\'t go on',
+    'cant go on',
+    'end it all',
+    'no reason to live',
+    'tired of living',
   ];
 
   /// Backwards-compatible entrypoint
@@ -25,59 +34,53 @@ class CrisisDetector {
   /// Detects if the message contains crisis-related keywords
   static bool detect(String message) {
     final lower = message.toLowerCase();
-
-    final triggers = <String>{...Constants.crisisTriggers, ..._localTriggers};
-    for (final trigger in triggers) {
-      if (lower.contains(trigger.toLowerCase())) return true;
+    final allTriggers = <String>{...Constants.crisisTriggers, ..._crisisTriggers};
+    for (final trigger in allTriggers) {
+      if (lower.contains(trigger.toLowerCase())) {
+        return true;
+      }
     }
-
     return false;
   }
 
   /// Returns the formatted crisis resource message as specified in Part 3.7
   static String getCrisisResourceMessage() {
-    return '''I'm sensing that you're going through an incredibly difficult time right now.
-Please know that you aren't alone and there are people who want to support you.
+    return '''I'm sensing that you're carrying a heavy burden and going through a painful moment right now.
+Please know that your life matters, you are not alone, and there is real support available right this second.
 
-Please reach out to someone right now:
-Here are some resources where you can find immediate help:
+Please reach out to one of these free, confidential helplines:
 
-🆘 ${Constants.icallName}
-   ${Constants.icallNumber}
-📞 ${Constants.icallName}: ${Constants.icallNumber}
-📞 ${Constants.vandrevalaName}: ${Constants.vandrevalaNumber}
-📞 ${Constants.aasraName}: ${Constants.aasraNumber}
+🆘 iCall Psychosocial Helpline: 9152987821 (Mon-Sat, 8am-10pm)
+🆘 Vandrevala Foundation: +91 9999 666 555 / 1860-2662-345 (24/7)
+🆘 AASRA Suicide Prevention: 9820466726 (24/7)
+🆘 Tele-MANAS (Govt of India): 14416 (24/7 Toll-Free)
 
-🆘 ${Constants.vandrevalaName}
-   ${Constants.vandrevalaNumber}
-
-🆘 ${Constants.aasraName}
-   ${Constants.aasraNumber}
-
-You deserve real, professional support.
-Please call now. 💙
-''';
+You deserve compassionate, professional support. Please reach out to them now. 💙''';
   }
 
-  /// Returns a structured list for the Profile screen
+  /// Returns a structured list for UI buttons and cards
   static List<Map<String, String>> getResources() {
     return [
       {
-        'name': Constants.icallName,
-        'number': Constants.icallNumber,
-        'desc': 'iCall - Psychosocial Helpline',
+        'name': 'iCall Psychosocial Helpline',
+        'number': '9152987821',
+        'desc': 'Mon-Sat, 8am-10pm • Professional support',
       },
       {
-        'name': Constants.vandrevalaName,
-        'number': Constants.vandrevalaNumber,
-        'desc': 'Free mental health support',
+        'name': 'Vandrevala Foundation',
+        'number': '+91 9999 666 555',
+        'desc': '24/7 Mental Health Helpline',
       },
       {
-        'name': Constants.aasraName,
-        'number': Constants.aasraNumber,
-        'desc': '24/7 Suicide Prevention',
+        'name': 'AASRA Helpline',
+        'number': '9820466726',
+        'desc': '24/7 Suicide Prevention & Crisis Intervention',
+      },
+      {
+        'name': 'Tele-MANAS',
+        'number': '14416',
+        'desc': '24/7 National Toll-Free Mental Health Service',
       },
     ];
   }
 }
-

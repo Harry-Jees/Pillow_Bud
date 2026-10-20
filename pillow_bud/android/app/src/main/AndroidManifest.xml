@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="pillow_bud"
+        android:label="Pillow Bud"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

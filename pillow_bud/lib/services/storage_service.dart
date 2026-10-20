@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pillow_bud/models/chat_message.dart';
@@ -56,6 +56,8 @@ class StorageService {
     _ensureInitialized();
     await _prefs.setString('theme', theme);
   }
+
+  static Future<void> saveTheme(String theme) => setTheme(theme);
 
   static String getTheme() {
     _ensureInitialized();

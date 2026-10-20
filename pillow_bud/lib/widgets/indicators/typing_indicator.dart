@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pillow_bud/theme/app_colors.dart';
 
 class TypingIndicator extends StatefulWidget {
   const TypingIndicator({super.key});
@@ -46,7 +45,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
                 shape: BoxShape.circle,
               ),
             ),

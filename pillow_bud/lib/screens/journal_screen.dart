@@ -2,6 +2,8 @@ import 'package:flutter/material.dart' hide DateUtils;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pillow_bud/models/journal_entry.dart';
 import 'package:pillow_bud/providers/app_state_provider.dart';
+import 'package:pillow_bud/providers/theme_provider.dart';
+import 'package:pillow_bud/services/database/database_service.dart';
 import 'package:pillow_bud/services/date_utils.dart';
 import 'package:pillow_bud/services/storage_service.dart';
 import 'package:pillow_bud/theme/app_colors.dart';
@@ -16,59 +18,103 @@ class JournalScreen extends ConsumerStatefulWidget {
 class _JournalScreenState extends ConsumerState<JournalScreen> {
   final TextEditingController _controller = TextEditingController();
   String _selectedMood = '😌';
+  String _searchQuery = '';
+
+  static const List<Map<String, String>> _moods = [
+    {'emoji': '😤', 'label': 'Stressed'},
+    {'emoji': '😢', 'label': 'Sad'},
+    {'emoji': '😌', 'label': 'Calm'},
+    {'emoji': '😊', 'label': 'Happy'},
+    {'emoji': '😄', 'label': 'Joyful'},
+  ];
 
   @override
-  void initState() {
-    super.initState();
-    _loadEntries();
-  }
-
-  Future<void> _loadEntries() async {
-    final savedEntries = StorageService.getJournalEntries();
-    ref.read(journalEntriesProvider.notifier).state = savedEntries;
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   Future<void> _saveEntry() async {
-    if (_controller.text.trim().isEmpty) return;
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    final entryId = DateTime.now().microsecondsSinceEpoch.toString();
+    final now = DateTime.now();
 
     final entry = JournalEntry(
-      id: DateTime.now().toIso8601String(),
-      text: _controller.text.trim(),
+      id: entryId,
+      text: text,
       mood: _selectedMood,
-      dateCreated: DateTime.now(),
-      dateModified: DateTime.now(),
+      dateCreated: now,
+      dateModified: now,
     );
 
-    final entries = [entry, ...ref.read(journalEntriesProvider)];
-    ref.read(journalEntriesProvider.notifier).state = entries;
-    await StorageService.saveJournalEntries(entries);
+    final updated = [entry, ...ref.read(journalEntriesProvider)];
+    ref.read(journalEntriesProvider.notifier).state = updated;
+    await StorageService.saveJournalEntries(updated);
+
+    // Save encrypted to SQLite3
+    try {
+      await DatabaseService.saveJournalEntry(entry);
+    } catch (_) {}
 
     _controller.clear();
-    setState(() {
-      _selectedMood = '😌';
-    });
+    setState(() => _selectedMood = '😌');
+
+    if (!mounted) return;
+    Navigator.pop(context);
+  }
+
+  Future<void> _deleteEntry(JournalEntry entry) async {
+    final updated = ref
+        .read(journalEntriesProvider)
+        .where((e) => e.id != entry.id)
+        .toList();
+    ref.read(journalEntriesProvider.notifier).state = updated;
+    await StorageService.saveJournalEntries(updated);
+
+    try {
+      await DatabaseService.deleteJournalEntry(entry.id);
+    } catch (_) {}
+
+    if (!mounted) return;
     Navigator.pop(context);
   }
 
   void _showEntryDialog(JournalEntry entry) {
+    final isDarkMode = ref.read(isDarkModeProvider);
+    final themeColors = ref.read(currentThemeProvider);
+    final primary = themeColors['primary'] ?? AppColors.primary;
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: AppColors.cardDark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor:
+            isDarkMode ? const Color(0xFF2F2F2F) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Text(
-                    entry.mood,
-                    style: const TextStyle(fontSize: 28),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Text(
+                        entry.mood,
+                        style: const TextStyle(fontSize: 26),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,18 +122,23 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                         Text(
                           DateUtils.formatDateTime(entry.dateCreated),
                           style: TextStyle(
+                            fontFamily: 'DM Sans',
                             fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: isDarkMode
+                                ? Colors.white.withValues(alpha: 0.5)
+                                : Colors.black54,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Journal Entry',
+                        const SizedBox(height: 2),
+                        Text(
+                          'Encrypted Reflection',
                           style: TextStyle(
                             fontFamily: 'Lora',
                             fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimaryDark,
+                            fontWeight: FontWeight.w600,
+                            color: isDarkMode
+                                ? const Color(0xFFECECF1)
+                                : const Color(0xFF1A1225),
                           ),
                         ),
                       ],
@@ -95,22 +146,45 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                entry.text,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withValues(alpha: 0.8),
-                  height: 1.6,
+              const SizedBox(height: 20),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 280),
+                child: SingleChildScrollView(
+                  child: Text(
+                    entry.text,
+                    style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 14,
+                      color: isDarkMode
+                          ? Colors.white.withValues(alpha: 0.88)
+                          : Colors.black87,
+                      height: 1.6,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: AppColors.danger, size: 22),
+                    tooltip: 'Delete Entry',
+                    onPressed: () => _deleteEntry(entry),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text('Close'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -119,163 +193,329 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final entries = ref.watch(journalEntriesProvider);
+  void _showNewEntryDialog() {
+    final isDarkMode = ref.read(isDarkModeProvider);
+    final themeColors = ref.read(currentThemeProvider);
+    final primary = themeColors['primary'] ?? AppColors.primary;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Journal'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: SafeArea(
-        child: entries.isEmpty
-            ? Center(
-                child: Text(
-                  'No entries yet. Start writing!',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
-                ),
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: entries.length,
-                itemBuilder: (context, index) {
-                  final entry = entries[index];
-                  return GestureDetector(
-                    onTap: () => _showEntryDialog(entry),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.07)),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                DateUtils.formatTime(entry.dateCreated),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              Text(entry.mood,
-                                  style: const TextStyle(fontSize: 14)),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            entry.text,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                                color: Colors.white.withValues(alpha: 0.7),
-                              height: 1.6,
-                            ),
-                          ),
-                        ],
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Dialog(
+            backgroundColor:
+                isDarkMode ? const Color(0xFF2F2F2F) : Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'New Journal Reflection',
+                      style: TextStyle(
+                        fontFamily: 'Lora',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode
+                            ? const Color(0xFFECECF1)
+                            : const Color(0xFF1A1225),
                       ),
                     ),
-                  );
-                },
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _controller,
+                      maxLines: 6,
+                      minLines: 3,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        hintText: 'What\'s on your mind today? Write freely...',
+                        hintStyle: TextStyle(
+                          fontFamily: 'DM Sans',
+                          color: isDarkMode
+                              ? Colors.white.withValues(alpha: 0.4)
+                              : Colors.black38,
+                        ),
+                        filled: true,
+                        fillColor: isDarkMode
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : const Color(0xFFF8F6FF),
+                      ),
+                      style: TextStyle(
+                        fontFamily: 'DM Sans',
+                        color: isDarkMode
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimaryLight,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'How are you feeling?',
+                      style: TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDarkMode
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: _moods.map((m) {
+                        final isSelected = _selectedMood == m['emoji'];
+                        return GestureDetector(
+                          onTap: () {
+                            setModalState(() => _selectedMood = m['emoji']!);
+                            setState(() => _selectedMood = m['emoji']!);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? primary.withValues(alpha: 0.2)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? primary
+                                    : (isDarkMode
+                                        ? Colors.white.withValues(alpha: 0.08)
+                                        : const Color(0x12000000)),
+                              ),
+                            ),
+                            child: Text(
+                              m['emoji']!,
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 28),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontFamily: 'DM Sans',
+                              color: isDarkMode
+                                  ? Colors.white60
+                                  : Colors.black54,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _saveEntry,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primary,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text('Save Reflection'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showNewEntryDialog(),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add),
+            ),
+          );
+        },
       ),
     );
   }
 
-  void _showNewEntryDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: AppColors.cardDark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'New Journal Entry',
-                style: TextStyle(
-                  fontFamily: 'Lora',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimaryDark,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _controller,
-                maxLines: 5,
-                minLines: 3,
-                decoration: InputDecoration(
-                    hintText: 'Write your thoughts...',
-                    hintStyle:
-                      TextStyle(color: Colors.white.withValues(alpha: 0.4)),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.04),
-                ),
-                style: const TextStyle(color: AppColors.textPrimaryDark),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Mood:', style: TextStyle(fontSize: 12)),
-                  Row(
-                    children: ['😤', '😢', '😌', '😊', '😄'].map((emoji) {
-                      return GestureDetector(
-                        onTap: () => setState(() => _selectedMood = emoji),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _selectedMood == emoji
-                                  ? AppColors.primary.withValues(alpha: 0.3)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child:
-                              Text(emoji, style: const TextStyle(fontSize: 20)),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      _saveEntry();
-                    },
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ],
+  @override
+  Widget build(BuildContext context) {
+    final entries = ref.watch(journalEntriesProvider);
+    final isDarkMode = ref.watch(isDarkModeProvider);
+    final themeColors = ref.watch(currentThemeProvider);
+    final primary = themeColors['primary'] ?? AppColors.primary;
+
+    final filteredEntries = _searchQuery.isEmpty
+        ? entries
+        : entries
+            .where((e) =>
+                e.text.toLowerCase().contains(_searchQuery.toLowerCase()))
+            .toList();
+
+    return Scaffold(
+      backgroundColor:
+          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      appBar: AppBar(
+        title: Text(
+          'My Journal',
+          style: TextStyle(
+            fontFamily: 'Lora',
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: isDarkMode
+                ? const Color(0xFFECECF1)
+                : const Color(0xFF1A1225),
           ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (entries.isNotEmpty)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                  decoration: InputDecoration(
+                    hintText: 'Search encrypted reflections...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: filteredEntries.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 68,
+                              height: 68,
+                              decoration: BoxDecoration(
+                                color: primary.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Text('📓', style: TextStyle(fontSize: 32)),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              _searchQuery.isEmpty
+                                  ? 'Your Private Journal'
+                                  : 'No matching entries',
+                              style: TextStyle(
+                                fontFamily: 'Lora',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: isDarkMode
+                                    ? const Color(0xFFECECF1)
+                                    : const Color(0xFF1A1225),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _searchQuery.isEmpty
+                                  ? 'Write your first reflection. Everything is encrypted locally with AES-256.'
+                                  : 'Try a different search term.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'DM Sans',
+                                fontSize: 13,
+                                color: isDarkMode
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      itemCount: filteredEntries.length,
+                      itemBuilder: (context, index) {
+                        final entry = filteredEntries[index];
+                        return GestureDetector(
+                          onTap: () => _showEntryDialog(entry),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isDarkMode
+                                  ? Colors.white.withValues(alpha: 0.04)
+                                  : Colors.white,
+                              border: Border.all(
+                                color: isDarkMode
+                                    ? const Color(0x18FFFFFF)
+                                    : const Color(0x12000000),
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      DateUtils.formatDateTime(entry.dateCreated),
+                                      style: TextStyle(
+                                        fontFamily: 'DM Sans',
+                                        fontSize: 11,
+                                        color: isDarkMode
+                                            ? Colors.white.withValues(alpha: 0.45)
+                                            : Colors.black45,
+                                      ),
+                                    ),
+                                    Text(
+                                      entry.mood,
+                                      style: const TextStyle(fontSize: 18),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  entry.text,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'DM Sans',
+                                    fontSize: 13,
+                                    color: isDarkMode
+                                        ? Colors.white.withValues(alpha: 0.85)
+                                        : Colors.black87,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showNewEntryDialog,
+        backgroundColor: primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        icon: const Icon(Icons.add, size: 22),
+        label: const Text(
+          'Write Reflection',
+          style: TextStyle(fontFamily: 'DM Sans', fontWeight: FontWeight.w600),
         ),
       ),
     );

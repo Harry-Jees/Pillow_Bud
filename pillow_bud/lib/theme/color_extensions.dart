@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
-extension ColorWithValuesExtension on Color {
-  Color withValues({required double alpha}) {
-    return withOpacity(alpha);
+/// Theme color utilities
+extension ColorOpacityHelper on Color {
+  /// Convenient alpha helper that maps cleanly to native withValues
+  Color withAlphaFraction(double fraction) {
+    return withValues(alpha: fraction);
   }
 }

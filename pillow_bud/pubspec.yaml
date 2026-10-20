@@ -20,29 +20,58 @@ dependencies:
   riverpod: ^2.5.1
   flutter_riverpod: ^2.5.1
   
-  # Local Storage
+  # System-Level Secure Storage & Encrypted SQLite3 Database
+  flutter_secure_storage: ^10.0.0
+  sqflite: ^2.3.3+1
+  sqflite_common_ffi: ^2.3.3
+  sqlite3: 2.4.6
+  encrypt: ^5.0.3
+  crypto: ^3.0.3
   shared_preferences: ^2.2.2
-  # Local DB
-  isar: ^3.0.0
-  isar_flutter_libs: ^3.0.0
   
   # Utilities
   intl: ^0.19.0
+  path: ^1.9.0
   path_provider: ^2.1.1
   uuid: ^4.0.0
-
-  # AI/ML Integration
-  flutter_gemma: ^0.0.1
-  background_downloader: ^9.5.4
+  
+  # AI/ML & Download Management
   dio: ^5.4.0
   markdown: ^7.1.0
+
+  # Biometrics & System Auth
+  local_auth: ^2.2.0
+
+  # Voice & Speech Input
+  speech_to_text: ^7.0.0
+
+  # Local Notifications
+  flutter_local_notifications: ^17.2.2
+
+  # Export / Sharing / File Picking
+  share_plus: ^10.0.0
+  file_picker: ^8.0.5
+  llama_cpp: ^1.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  isar_generator: ^3.0.0
-  build_runner: ^2.4.6
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  image_path: "assets/images/app_icon.png"
+  android: true
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/images/app_icon.png"
+  windows:
+    generate: true
+    image_path: "assets/images/app_icon.png"
+  macos:
+    generate: true
+    image_path: "assets/images/app_icon.png"
 
 flutter:
   uses-material-design: true
@@ -66,4 +95,7 @@ flutter:
   
   assets:
     - assets/images/
+    - assets/secrets.json
 
+dependency_overrides:
+  sqlite3: 2.4.6
