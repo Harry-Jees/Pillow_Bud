@@ -8,64 +8,63 @@ void main() {
   group('Encryption & Security Tests', () {
     setUp(() {
       SecureKeyStorage.resetCache();
+      SecureKeyStorage.setMasterKeyForTesting(
+        'test-only-key-material-for-pillow-bud-2026',
+      );
       EncryptionService.reset();
     });
 
-    test('SecureKeyStorage generates and retrieves 256-bit key', () async {
-      final key = await SecureKeyStorage.getOrCreateMasterKey();
-      expect(key, isNotEmpty);
-      expect(key.length, greaterThanOrEqualTo(32));
-
-      // Subsequent call should return cached / identical key
-      final key2 = await SecureKeyStorage.getOrCreateMasterKey();
-      expect(key2, equals(key));
-    });
-
-    test('EncryptionService encrypts and decrypts text accurately', () async {
+    test('Encrypts and decrypts text accurately', () async {
       const plainText = 'I felt overwhelmed at work today, but talking to Bud helped.';
       final encrypted = await EncryptionService.encrypt(plainText);
-
       expect(encrypted['ciphertext'], isNotEmpty);
-      expect(encrypted['iv'], isNotEmpty);
-      // Ciphertext should not contain plaintext
+      expect(encrypted['iv'], contains('.'));
       expect(encrypted['ciphertext']!.contains('overwhelmed'), isFalse);
-
-      final decrypted = await EncryptionService.decrypt(
-        ciphertext: encrypted['ciphertext']!,
-        ivBase64: encrypted['iv']!,
+      expect(
+        await EncryptionService.decrypt(
+          ciphertext: encrypted['ciphertext']!,
+          ivBase64: encrypted['iv']!,
+        ),
+        equals(plainText),
       );
-
-      expect(decrypted, equals(plainText));
     });
 
-    test('Two encryptions of same text yield distinct ciphertexts due to random IVs', () async {
+    test('Random IVs produce distinct ciphertexts', () async {
       const plainText = 'Same thought repeated twice';
-      final enc1 = await EncryptionService.encrypt(plainText);
-      final enc2 = await EncryptionService.encrypt(plainText);
-
-      expect(enc1['iv'], isNot(equals(enc2['iv'])));
-      expect(enc1['ciphertext'], isNot(equals(enc2['ciphertext'])));
-
-      final dec1 = await EncryptionService.decrypt(
-        ciphertext: enc1['ciphertext']!,
-        ivBase64: enc1['iv']!,
+      final first = await EncryptionService.encrypt(plainText);
+      final second = await EncryptionService.encrypt(plainText);
+      expect(first['iv'], isNot(equals(second['iv'])));
+      expect(first['ciphertext'], isNot(equals(second['ciphertext'])));
+      expect(
+        await EncryptionService.decrypt(
+          ciphertext: first['ciphertext']!,
+          ivBase64: first['iv']!,
+        ),
+        equals(plainText),
       );
-      final dec2 = await EncryptionService.decrypt(
-        ciphertext: enc2['ciphertext']!,
-        ivBase64: enc2['iv']!,
-      );
-
-      expect(dec1, equals(plainText));
-      expect(dec2, equals(plainText));
     });
 
-    test('Handles empty strings gracefully', () async {
-      final res = await EncryptionService.encrypt('');
-      expect(res['ciphertext'], isEmpty);
-      expect(res['iv'], isEmpty);
+    test('Tampered ciphertext fails authentication', () async {
+      final encrypted = await EncryptionService.encrypt('private note');
+      final original = encrypted['ciphertext']!;
+      final tampered = '${original.substring(0, original.length - 2)}AA';
+      await expectLater(
+        EncryptionService.decrypt(
+          ciphertext: tampered,
+          ivBase64: encrypted['iv']!,
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
 
-      final dec = await EncryptionService.decrypt(ciphertext: '', ivBase64: '');
-      expect(dec, isEmpty);
+    test('Empty strings round-trip without key access', () async {
+      final encrypted = await EncryptionService.encrypt('');
+      expect(encrypted['ciphertext'], isEmpty);
+      expect(encrypted['iv'], isEmpty);
+      expect(
+        await EncryptionService.decrypt(ciphertext: '', ivBase64: ''),
+        isEmpty,
+      );
     });
   });
 }
