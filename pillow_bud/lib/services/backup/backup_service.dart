@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'package:pillow_bud/services/encryption/secure_key_storage.dart';
+import 'package:pillow_bud/services/encryption/encryption_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pillow_bud/services/database/database_service.dart';
 
@@ -37,7 +38,7 @@ class BackupService {
     for (final row in chatRows) {
       final mood = row['mood'];
       if (mood is String && mood.isNotEmpty && row['mood_iv'] == null) {
-        final encrypted = await DatabaseService.encryptBackupField(mood);
+        final encrypted = await EncryptionService.encrypt(mood);
         row['mood'] = encrypted['ciphertext'];
         row['mood_iv'] = encrypted['iv'];
       }
