@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -122,11 +123,11 @@ class StorageService {
         // Migrate legacy plaintext preferences to authenticated ciphertext.
         payload = jsonString;
         final encrypted = EncryptionService.encryptSync(payload);
-        _prefs.setString('chatMessages', jsonEncode({
+        unawaited(_prefs.setString('chatMessages', jsonEncode({
           'version': 1,
           'ciphertext': encrypted['ciphertext'],
           'iv': encrypted['iv'],
-        }));
+        })));
       } else {
         throw const FormatException('Unsupported stored chat format.');
       }
@@ -168,11 +169,11 @@ class StorageService {
         // Migrate legacy plaintext preferences to authenticated ciphertext.
         payload = jsonString;
         final encrypted = EncryptionService.encryptSync(payload);
-        _prefs.setString('journalEntries', jsonEncode({
+        unawaited(_prefs.setString('journalEntries', jsonEncode({
           'version': 1,
           'ciphertext': encrypted['ciphertext'],
           'iv': encrypted['iv'],
-        }));
+        })));
       } else {
         throw const FormatException('Unsupported stored journal format.');
       }
