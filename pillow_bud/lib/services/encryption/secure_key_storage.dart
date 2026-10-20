@@ -41,7 +41,7 @@ class SecureKeyStorage {
       }
       _cachedKey = key;
       return key;
-    } catch (error) {
+    } catch (_) {
       debugPrint('SecureKeyStorage: secure key access failed.');
       throw StateError(
         'Pillow Bud cannot access secure key storage. '
@@ -56,6 +56,11 @@ class SecureKeyStorage {
       List<int>.generate(32, (_) => random.nextInt(256), growable: false),
     );
     return base64UrlEncode(bytes);
+  }
+
+  @visibleForTesting
+  static void setMasterKeyForTesting(String key) {
+    _cachedKey = key;
   }
 
   static void resetCache() {
