@@ -23,9 +23,42 @@ class BackupService {
   /// Returns the [File] so the caller can share / save it.
   static Future<File> exportData() async {
     // 1. Fetch raw (already-encrypted) rows – no decryption needed.
-    final chatRows = await DatabaseService.getRawChatMessageRows();
-    final journalRows = await DatabaseService.getRawJournalEntryRows();
-    final moodRows = await DatabaseService.getRawMoodRows();
+    final chatRows = (await DatabaseService.getRawChatMessageRows())
+        .map(Map<String, dynamic>.from)
+        .toList();
+    final journalRows = (await DatabaseService.getRawJournalEntryRows())
+        .map(Map<String, dynamic>.from)
+        .toList();
+    final moodRows = (await DatabaseService.getRawMoodRows())
+        .map(Map<String, dynamic>.from)
+        .toList();
+
+    // Encrypt legacy plaintext mood metadata before it enters an export.
+    for (final row in chatRows) {
+      final mood = row['mood'];
+      if (mood is String && mood.isNotEmpty && row['mood_iv'] == null) {
+        final encrypted = await DatabaseService.encryptBackupField(mood);
+        row['mood'] = encrypted['ciphertext'];
+        row['mood_iv'] = encrypted['iv'];
+      }
+    }
+    for (final row in journalRows) {
+      final mood = row['mood'];
+      if (mood is String && mood.isNotEmpty && row['mood_iv'] == null) {
+        final encrypted = await DatabaseService.encryptBackupField(mood);
+        row['mood'] = encrypted['ciphertext'];
+        row['mood_iv'] = encrypted['iv'];
+      }
+    }
+    for (final row in moodRows) {
+      final mood = row['mood'];
+      if (mood is String && mood.isNotEmpty && row['mood_iv'] == null) {
+        final encrypted = await DatabaseService.encryptBackupField(mood);
+        row['mood'] = encrypted['ciphertext'];
+        row['mood_iv'] = encrypted['iv'];
+      }
+    }
+
     final masterKey = await SecureKeyStorage.getOrCreateMasterKey();
     final keyFingerprint = sha256.convert(utf8.encode(masterKey)).toString();
 
