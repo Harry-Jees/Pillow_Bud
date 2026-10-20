@@ -19,8 +19,9 @@ Prioritize review of:
 ## Current limitations
 
 - Older records may use unauthenticated AES-CBC encryption for backward compatibility.
-- Some chat/journal state remains in SharedPreferences.
+- Chat/journal payloads are encrypted before being stored in SharedPreferences, but they are duplicated across persistence layers and should be consolidated.
 - Exported backups are Base64-encoded, not encrypted.
 - A local AI model can produce incorrect or unsafe content; crisis detection is not a substitute for emergency support.
+- Backups are not encrypted as complete files and are currently installation-key-bound.
 
 Do not describe the app as fully encrypted or production-secure until these limitations are addressed and verified.
