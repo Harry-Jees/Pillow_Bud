@@ -15,8 +15,8 @@ void main() {
       expect(ModelDownloadService.progressNotifier.value, inInclusiveRange(0.0, 1.0));
     });
 
-    test('Cancel download resets progress safely', () {
-      ModelDownloadService.cancelDownload();
+    test('Cancel download resets progress safely', () async {
+      await ModelDownloadService.cancelDownload();
       expect(ModelDownloadService.statusNotifier.value, equals(ModelDownloadStatus.notDownloaded));
       expect(ModelDownloadService.progressNotifier.value, equals(0.0));
     });
