@@ -1,28 +1,38 @@
-﻿# Flutter
+# Flutter/Dart build output
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 .pub/
-pubspec.lock
 build/
+coverage/
 *.apk
+*.aab
+*.app
+*.dSYM/
+.gradle/
 .gradle*/
 .gradle-user/
 **/.kotlin/
+**/ios/Flutter/.last_build_id
 
-# IDE
+# IDE and OS files
 .idea/
 .vscode/
 *.swp
 *.swo
 *.swn
 .DS_Store
-
-# Environment
-.env
-.env.local
-
-# Misc
-*.log
 *.iml
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+**/key.properties
+**/*.jks
+**/*.keystore
+**/secrets.json
+
+# Logs
+*.log
