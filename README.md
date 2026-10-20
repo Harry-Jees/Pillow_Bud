@@ -48,8 +48,8 @@ Release builds must use a private upload keystore configured in `pillow_bud/andr
 - Chat and journal content is encrypted before database persistence.
 - New database records use AES-CBC with HMAC-SHA256 authentication; older records remain readable for migration and are not authenticated.
 - Mood labels are encrypted in newly written database records.
-- Preferences and some app state still use platform preferences; do not treat every stored value or exported backup as encrypted.
-- Exported backups are currently Base64-encoded, **not encrypted**. Treat them as sensitive and do not share them.
+- Non-sensitive preferences use platform preferences; serialized chat and journal payloads are encrypted there too. Exported backups are not encrypted.
+- Exported backups are Base64-encoded, **not encrypted**. They are bound to the installation key and cannot currently be restored on a different installation. Treat them as sensitive.
 - Local inference does not require a hosted AI endpoint, but downloading the model requires a network connection.
 
 Read [SECURITY.md](SECURITY.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making security or persistence changes.
