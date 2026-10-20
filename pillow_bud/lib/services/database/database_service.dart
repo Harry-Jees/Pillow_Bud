@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -240,7 +241,7 @@ class DatabaseService {
       'onboardingCompletedAt': pref.onboardingCompletedAt?.toIso8601String(),
     };
 
-    final encrypted = await EncryptionService.encrypt(rawJson.toString());
+    final encrypted = await EncryptionService.encrypt(jsonEncode(rawJson));
 
     await _db!.insert(
       'user_preferences',
