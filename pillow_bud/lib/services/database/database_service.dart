@@ -9,8 +9,8 @@ import 'package:pillow_bud/models/user_preference.dart';
 import 'package:pillow_bud/services/encryption/encryption_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-/// Lightweight SQLite3 Database Service with transparent column-level AES-256 encryption.
-/// Fully compatible with Android, iOS, Windows, macOS, Linux, and Web.
+/// SQLite persistence with authenticated encryption for sensitive record fields.
+/// The database service uses native/FFI APIs and is not Web-compatible.
 class DatabaseService {
   static Database? _db;
 
