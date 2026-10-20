@@ -6,7 +6,7 @@ import 'package:pillow_bud/services/encryption/secure_key_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pillow_bud/services/database/database_service.dart';
 
-/// Handles AES-256 encrypted export and import of all Pillow Bud data.
+/// Exports encrypted database rows with visible metadata; the archive itself is not encrypted.
 ///
 /// Export format: `PBv2:<base64(JSON)>`. This is encoding, not file encryption.
 /// The JSON payload contains raw encrypted SQLite rows (ciphertext + iv pairs)
@@ -18,7 +18,7 @@ class BackupService {
   //  EXPORT
   // ──────────────────────────────────────────────────────────
 
-  /// Exports all data to an encrypted `.pillowbak` file in the device cache dir.
+  /// Exports a `.pillowbak` file to the device cache directory. The file is not encrypted.
   ///
   /// Returns the [File] so the caller can share / save it.
   static Future<File> exportData() async {
@@ -57,7 +57,7 @@ class BackupService {
   //  IMPORT
   // ──────────────────────────────────────────────────────────
 
-  /// Imports a `.pillowbak` file and restores data into SQLite.
+  /// Imports a same-installation `.pillowbak` file and restores rows into SQLite.
   ///
   /// Throws [FormatException] for invalid files.
   /// Returns an [ImportResult] with per-table counts.
