@@ -19,7 +19,7 @@ The downloader currently targets `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` from the U
 
 Chat and journal text is encrypted before database writes. New records use AES-CBC plus HMAC-SHA256 authentication with independent derived key material. Older records containing only an IV are supported for compatibility and are not authenticated. Newly written mood labels are encrypted; legacy mood labels may remain plaintext until migrated or rewritten.
 
-The app also stores some settings and serialized chat/journal data in `SharedPreferences`. The backup export currently Base64-encodes JSON and is **not encrypted**. Do not claim that all application data or backups are encrypted.
+`StorageService` stores ordinary preferences in SharedPreferences and encrypts serialized chat/journal payloads before saving them there. This duplicate persistence path should eventually be consolidated. Backup export Base64-encodes JSON and is **not encrypted**; it is installation-key-bound and cannot currently be restored on a different installation.
 
 ## Platform limits
 
