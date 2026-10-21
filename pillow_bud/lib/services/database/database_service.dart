@@ -142,10 +142,27 @@ class DatabaseService {
 
     final List<ChatMessage> messages = [];
     for (final row in maps) {
-      final text = await EncryptionService.decrypt(
+      final text = await _decryptAndMigrateField(
+        table: 'chat_messages',
+        id: row['id'] as String,
+        column: 'ciphertext',
+        ivColumn: 'iv',
         ciphertext: row['ciphertext'] as String,
-        ivBase64: row['iv'] as String,
+        ivValue: row['iv'] as String,
       );
+
+      final moodValue = row['mood'] as String?;
+      if (moodValue != null && moodValue.isNotEmpty) {
+        await _decryptAndMigrateField(
+          table: 'chat_messages',
+          id: row['id'] as String,
+          column: 'mood',
+          ivColumn: 'mood_iv',
+          ciphertext: moodValue,
+          ivValue: row['mood_iv'] as String?,
+          plaintextWhenIvMissing: true,
+        );
+      }
 
       messages.add(ChatMessage(
         id: row['id'] as String,
@@ -197,18 +214,24 @@ class DatabaseService {
     final List<JournalEntry> entries = [];
 
     for (final row in maps) {
-      final text = await EncryptionService.decrypt(
+      final text = await _decryptAndMigrateField(
+        table: 'journal_entries',
+        id: row['id'] as String,
+        column: 'ciphertext',
+        ivColumn: 'iv',
         ciphertext: row['ciphertext'] as String,
-        ivBase64: row['iv'] as String,
+        ivValue: row['iv'] as String,
       );
 
-      final moodIv = row['mood_iv'] as String?;
-      final mood = moodIv == null || moodIv.isEmpty
-          ? row['mood'] as String
-          : await EncryptionService.decrypt(
-              ciphertext: row['mood'] as String,
-              ivBase64: moodIv,
-            );
+      final mood = await _decryptAndMigrateField(
+        table: 'journal_entries',
+        id: row['id'] as String,
+        column: 'mood',
+        ivColumn: 'mood_iv',
+        ciphertext: row['mood'] as String,
+        ivValue: row['mood_iv'] as String?,
+        plaintextWhenIvMissing: true,
+      );
 
       entries.add(JournalEntry(
         id: row['id'] as String,
@@ -282,17 +305,73 @@ class DatabaseService {
     final result = <Map<String, dynamic>>[];
     for (final source in rows) {
       final row = Map<String, dynamic>.from(source);
-      final moodIv = row['mood_iv'] as String?;
-      // Rows created before schema v2 stored mood labels in plaintext.
-      if (moodIv != null && moodIv.isNotEmpty) {
-        row['mood'] = await EncryptionService.decrypt(
-          ciphertext: row['mood'] as String,
-          ivBase64: moodIv,
+      // Older schema rows may contain plaintext mood labels; migrate them
+      // to authenticated ciphertext the first time they are read.
+      row['mood'] = await _decryptAndMigrateField(
+        table: 'mood_logs',
+        id: row['id'] as String,
+        column: 'mood',
+        ivColumn: 'mood_iv',
+        ciphertext: row['mood'] as String,
+        ivValue: row['mood_iv'] as String?,
+        plaintextWhenIvMissing: true,
+      );
+      final noteCiphertext = row['note_ciphertext'] as String?;
+      if (noteCiphertext != null && noteCiphertext.isNotEmpty) {
+        row['note'] = await _decryptAndMigrateField(
+          table: 'mood_logs',
+          id: row['id'] as String,
+          column: 'note_ciphertext',
+          ivColumn: 'iv',
+          ciphertext: noteCiphertext,
+          ivValue: row['iv'] as String?,
         );
       }
       result.add(row);
     }
     return result;
+  }
+
+  /// Reads an encrypted field and upgrades legacy unauthenticated records in place.
+  ///
+  /// Fields with [plaintextWhenIvMissing] are known legacy metadata columns that
+  /// were stored as plaintext before schema v2. Other fields with a missing IV
+  /// fail closed instead of guessing how the value was encoded.
+  static Future<String> _decryptAndMigrateField({
+    required String table,
+    required String id,
+    required String column,
+    required String ivColumn,
+    required String ciphertext,
+    required String? ivValue,
+    bool plaintextWhenIvMissing = false,
+  }) async {
+    if (ciphertext.isEmpty) return '';
+
+    final hasIv = ivValue != null && ivValue.isNotEmpty;
+    final plaintextLegacy = !hasIv && plaintextWhenIvMissing;
+    if (!hasIv && !plaintextLegacy) {
+      throw const FormatException('Encrypted record is missing its IV.');
+    }
+
+    final plaintext = plaintextLegacy
+        ? ciphertext
+        : await EncryptionService.decrypt(
+            ciphertext: ciphertext,
+            ivBase64: ivValue!,
+          );
+
+    // Authenticated records already use the IV-plus-MAC format.
+    if (hasIv && ivValue!.contains('.')) return plaintext;
+
+    final upgraded = await EncryptionService.encrypt(plaintext);
+    await _db!.update(
+      table,
+      {column: upgraded['ciphertext'], ivColumn: upgraded['iv']},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return plaintext;
   }
 
   // ==================== RAW-ROW HELPERS (for BackupService) ====================
