@@ -136,58 +136,25 @@ class BackupService {
     final journalRows = _validatedRows(data, 'journal_entries');
     final moodRows = _validatedRows(data, 'mood_logs');
 
-    int chats = 0, journals = 0, moods = 0;
-    int skippedChats = 0, skippedJournals = 0, skippedMoods = 0;
-
-    for (final row in chatRows) {
-      try {
-        await DatabaseService.insertRawRow(
-          table: 'chat_messages',
-          row: Map<String, dynamic>.from(row as Map),
-        );
-        chats++;
-      } catch (e) {
-        skippedChats++;
-        debugPrint('BackupService: skipped chat row: $e');
-      }
-    }
-
-    for (final row in journalRows) {
-      try {
-        await DatabaseService.insertRawRow(
-          table: 'journal_entries',
-          row: Map<String, dynamic>.from(row as Map),
-        );
-        journals++;
-      } catch (e) {
-        skippedJournals++;
-        debugPrint('BackupService: skipped journal row: $e');
-      }
-    }
-
-    for (final row in moodRows) {
-      try {
-        await DatabaseService.insertRawRow(
-          table: 'mood_logs',
-          row: Map<String, dynamic>.from(row as Map),
-        );
-        moods++;
-      } catch (e) {
-        skippedMoods++;
-        debugPrint('BackupService: skipped mood row: $e');
-      }
-    }
+    // Restore every table in a single SQLite transaction. A malformed row or
+    // schema mismatch rolls back the complete import instead of silently
+    // leaving a partially restored database.
+    await DatabaseService.restoreRawRowsTransaction(
+      rowsByTable: {
+        'chat_messages': chatRows,
+        'journal_entries': journalRows,
+        'mood_logs': moodRows,
+      },
+    );
 
     debugPrint(
-      'BackupService: imported $chats chats, $journals journals, $moods moods.',
+      'BackupService: imported ${chatRows.length} chats, '
+      '${journalRows.length} journals, ${moodRows.length} moods.',
     );
     return ImportResult(
-      chats: chats,
-      journals: journals,
-      moods: moods,
-      skippedChats: skippedChats,
-      skippedJournals: skippedJournals,
-      skippedMoods: skippedMoods,
+      chats: chatRows.length,
+      journals: journalRows.length,
+      moods: moodRows.length,
     );
   }
 
