@@ -20,6 +20,29 @@ void main() {
     SecureKeyStorage.resetCache();
   });
 
+  test('does not report a restore as successful when the database is unavailable', () async {
+    final fingerprint = sha256.convert(utf8.encode(testKey)).toString();
+    final payload = jsonEncode({
+      'version': 2,
+      'key_fingerprint': fingerprint,
+      'chat_messages': <dynamic>[],
+      'journal_entries': <dynamic>[],
+      'mood_logs': <dynamic>[],
+    });
+    final file = await File(
+      '${Directory.systemTemp.path}/pillow_bud_no_db_${DateTime.now().microsecondsSinceEpoch}.pillowbak',
+    ).create();
+    try {
+      await file.writeAsString('PBv2:${base64Encode(utf8.encode(payload))}');
+      await expectLater(
+        BackupService.importData(file),
+        throwsA(isA<StateError>()),
+      );
+    } finally {
+      if (await file.exists()) await file.delete();
+    }
+  });
+
   test('rejects malformed table structure before attempting restore', () async {
     final fingerprint = sha256.convert(utf8.encode(testKey)).toString();
     final payload = jsonEncode({
