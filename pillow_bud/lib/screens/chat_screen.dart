@@ -75,6 +75,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    ref.read(isLoadingChatProvider.notifier).state = false;
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -132,6 +133,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     } catch (_) {}
 
+    // The screen may have been closed while persistence was in flight.
+    if (!mounted) return;
+
     // Show crisis popup if triggered
     if (isCrisis && mounted) {
       _showCrisisDialog();
@@ -142,7 +146,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollToBottom();
 
     try {
-      final responseText = await ref.read(budResponseProvider(text).future);
+      final responseText = await ref
+          .read(llmServiceProvider)
+          .getEmotionalBudResponse(
+            userMessage: text,
+            userName: ref.read(userNameProvider),
+            personalityMode: ref.read(buddyPersonalityProvider),
+          );
+
+      if (!mounted) return;
 
       final budMessage = ChatMessage(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -165,6 +177,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         );
       } catch (_) {}
     } catch (e) {
+      if (!mounted) return;
       final errorMessage = ChatMessage(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         text: 'I\'m here with you. Take a slow, steady breath. What feels heaviest right now?',
@@ -177,8 +190,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         errorMessage,
       ];
     } finally {
-      ref.read(isLoadingChatProvider.notifier).state = false;
-      _scrollToBottom();
+      if (mounted) {
+        ref.read(isLoadingChatProvider.notifier).state = false;
+        _scrollToBottom();
+      }
     }
   }
 
