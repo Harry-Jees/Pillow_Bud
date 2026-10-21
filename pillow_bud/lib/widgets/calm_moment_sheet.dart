@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pillow_bud/services/storage_service.dart';
 import 'package:pillow_bud/theme/app_colors.dart';
 
 /// A small, offline-friendly pause with guided breathing and grounding prompts.
@@ -16,6 +17,7 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
   bool _isGrounding = false;
   String _phase = 'Ready when you are';
   String _selectedSmallStep = '';
+  List<String> _copingPlan = [];
   final TextEditingController _situationController = TextEditingController();
   final TextEditingController _thoughtController = TextEditingController();
   final TextEditingController _balancedThoughtController = TextEditingController();
@@ -39,6 +41,11 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
   @override
   void initState() {
     super.initState();
+    try {
+      _copingPlan = StorageService.getCopingPlan();
+    } catch (_) {
+      _copingPlan = [];
+    }
     _breathController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -406,7 +413,7 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
                       }),
                     ),
                   ),
-                  if (_selectedSmallStep.isNotEmpty)
+                  if (_selectedSmallStep.isNotEmpty) ...[
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -422,6 +429,52 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final updated = [..._copingPlan, _selectedSmallStep].toSet().toList();
+                        try {
+                          await StorageService.saveCopingPlan(updated);
+                          if (mounted) {
+                            setState(() => _copingPlan = updated);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Added to your personal coping plan.')),
+                            );
+                          }
+                        } catch (error) {
+                          debugPrint('CalmMomentSheet: coping plan save failed: $error');
+                        }
+                      },
+                      icon: const Icon(Icons.bookmark_add_outlined),
+                      label: const Text('Save to my coping plan'),
+                    ),
+                  ],
+                  if (_copingPlan.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Text('Your personal coping plan', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 6),
+                    ..._copingPlan.map(
+                      (step) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.check_circle_outline_rounded, color: primary),
+                        title: Text(step),
+                        trailing: IconButton(
+                          tooltip: 'Remove from coping plan',
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () async {
+                            final updated = _copingPlan.where((item) => item != step).toList();
+                            try {
+                              await StorageService.saveCopingPlan(updated);
+                              if (mounted) setState(() => _copingPlan = updated);
+                            } catch (error) {
+                              debugPrint('CalmMomentSheet: coping plan update failed: $error');
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
