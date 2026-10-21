@@ -22,6 +22,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _hasInput = false;
+  int _historyGeneration = 0;
 
   @override
   void initState() {
@@ -36,12 +37,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _loadChatHistory() async {
+    final generation = _historyGeneration;
     final sessionId = ref.read(currentChatIdProvider);
     try {
       final history = await DatabaseService.getAllChatMessages(
         sessionId: sessionId,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _historyGeneration) return;
       // Merge with messages sent while the database read was in flight.
       // IDs prevent duplicate bubbles; timestamps preserve conversation order.
       final currentMessages = ref.read(chatMessagesProvider);
@@ -52,7 +54,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final mergedHistory = mergedById.values.toList()
         ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-      if (!mounted) return;
+      if (!mounted || generation != _historyGeneration) return;
       ref.read(chatMessagesProvider.notifier).state = mergedHistory;
       ref.read(llmServiceProvider).restoreConversationHistory(
         mergedHistory.map((message) => {
@@ -291,6 +293,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
+              // Invalidate any history read already in flight so it cannot
+              // repopulate this conversation after the user starts fresh.
+              _historyGeneration++;
               final sessionId = ref.read(currentChatIdProvider);
               ref.read(chatMessagesProvider.notifier).state = [];
               ref.read(currentChatEmotionProvider.notifier).state = '';
