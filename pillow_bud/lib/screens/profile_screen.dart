@@ -415,6 +415,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         file,
         passphrase: passphrase,
       );
+      ref.read(journalEntriesProvider.notifier).state =
+          await DatabaseService.getAllJournalEntries();
+      ref.invalidate(moodHistoryProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
