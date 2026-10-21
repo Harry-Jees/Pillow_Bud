@@ -376,6 +376,14 @@ class DatabaseService {
 
   // ==================== RAW-ROW HELPERS (for BackupService) ====================
 
+  /// Encrypts a legacy plaintext metadata field for safe inclusion in backups.
+  ///
+  /// This helper does not make the backup archive itself encrypted; it only
+  /// protects the supplied field using the current installation key.
+  static Future<Map<String, String>> encryptBackupField(String plaintext) {
+    return EncryptionService.encrypt(plaintext);
+  }
+
   /// Returns raw encrypted rows from [chat_messages] without decrypting.
   static Future<List<Map<String, dynamic>>> getRawChatMessageRows() async {
     if (!isInitialized) return [];
