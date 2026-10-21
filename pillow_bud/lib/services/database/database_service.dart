@@ -176,6 +176,36 @@ class DatabaseService {
     return messages;
   }
 
+  /// Lists persisted conversations newest-first without exposing message bodies
+  /// to SQL; titles are derived only after authenticated decryption.
+  static Future<List<Map<String, dynamic>>> getChatSessions() async {
+    if (!isInitialized) return [];
+    final groups = await _db!.rawQuery(
+      'SELECT session_id, MAX(timestamp) AS last_activity, COUNT(*) AS message_count '
+      'FROM chat_messages GROUP BY session_id ORDER BY last_activity DESC',
+    );
+    final sessions = <Map<String, dynamic>>[];
+    for (final group in groups) {
+      final id = group['session_id'] as String?;
+      if (id == null || id.isEmpty) continue;
+      final messages = await getAllChatMessages(sessionId: id);
+      final firstUser = messages.where((message) => !message.isFromBud);
+      final firstText = firstUser.isEmpty ? 'Quiet conversation' : firstUser.first.text;
+      final title = firstText.replaceAll(RegExp(r'\\s+'), ' ').trim();
+      sessions.add({
+        'id': id,
+        'title': title.isEmpty
+            ? 'Quiet conversation'
+            : title.length > 42
+                ? '${title.substring(0, 39)}…'
+                : title,
+        'last_activity': group['last_activity'] as int? ?? 0,
+        'message_count': group['message_count'] as int? ?? messages.length,
+      });
+    }
+    return sessions;
+  }
+
   static Future<void> clearAllChatMessages({String? sessionId}) async {
     if (!isInitialized) return;
     if (sessionId != null && sessionId.isNotEmpty) {
