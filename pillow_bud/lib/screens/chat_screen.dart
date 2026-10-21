@@ -176,7 +176,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           userName: ref.read(userNameProvider),
           personalityMode: ref.read(buddyPersonalityProvider),
         )) {
-          if (!mounted) return;
+          if (!mounted || ref.read(currentChatIdProvider) != sessionId) return;
           responseText += token;
           final liveMessage = ChatMessage(
             id: budMessageId,
@@ -201,7 +201,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _scrollToBottom();
         }
 
-        if (!mounted) return;
+        if (!mounted || ref.read(currentChatIdProvider) != sessionId) return;
         // Streaming may yield no tokens on a disposed/empty engine. Keep the
         // chat recoverable and avoid saving an empty assistant message.
         if (responseText.trim().isEmpty) {
