@@ -89,6 +89,10 @@ void main() {
     });
 
     test('Empty strings round-trip without key access', () async {
+      // Reset the injected test key to prove empty values do not need secure storage.
+      EncryptionService.reset();
+      SecureKeyStorage.resetCache();
+
       final encrypted = await EncryptionService.encrypt('');
       expect(encrypted['ciphertext'], isEmpty);
       expect(encrypted['iv'], isEmpty);
