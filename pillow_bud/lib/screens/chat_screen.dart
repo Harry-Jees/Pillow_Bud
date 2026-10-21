@@ -48,7 +48,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ref.read(chatMessagesProvider.notifier).state = history;
         if (history.isNotEmpty) _scrollToBottom();
       }
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
