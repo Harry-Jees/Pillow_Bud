@@ -69,13 +69,12 @@ class ModelDownloadService {
           statusNotifier.value = ModelDownloadStatus.downloaded;
           progressNotifier.value = 1.0;
           statusMessageNotifier.value = 'Qwen3 4B Instruct (Local GGUF Ready)';
-          // Hot-load local engine for development persistence
-          LocalLLMEngine.getInstance().catchError((e) {
-            debugPrint('LocalLLMEngine hot load warning: $e');
-            return LocalLLMEngine.dummy();
-          });
           return true;
         }
+
+        // Older versions could leave a truncated file at the final path.
+        // Never advertise it as ready or pass it to the native inference engine.
+        await file.delete();
       }
 
       // Check if partial download exists
@@ -140,13 +139,254 @@ class ModelDownloadService {
       );
 
       final isPartial = response.statusCode == 206;
+      if (response.statusCode != 200 && response.statusCode != 206) {
+        throw StateError('Unexpected model download HTTP status: ${response.statusCode}');
+      }
+      if (isPartial && existingLength == 0) {
+        throw StateError('The server returned a partial response without a resumable file.');
+      }
+      if (isPartial) {
+        final contentRange = response.headers.value('content-range');
+        final match = contentRange == null
+            ? null
+            : RegExp(r'^bytes (\\d+)-(\\d+)/(\\d+|\\*)
+
+      int receivedNow = 0;
+      final stream = response.data!.stream;
+
+      await for (final chunk in stream) {
+        sink.add(chunk);
+        receivedNow += chunk.length;
+        final currentTotalReceived = existingLength + receivedNow;
+
+        if (totalBytes > 0) {
+          final progress = (currentTotalReceived / totalBytes).clamp(0.0, 1.0);
+          progressNotifier.value = progress;
+          final currentMB = (currentTotalReceived / (1024 * 1024)).toStringAsFixed(1);
+          final totalMB = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
+          statusMessageNotifier.value =
+              'Downloading model: $currentMB MB / $totalMB MB (${(progress * 100).toStringAsFixed(0)}%)';
+        } else {
+          final currentMB = (currentTotalReceived / (1024 * 1024)).toStringAsFixed(1);
+          statusMessageNotifier.value = 'Downloading: $currentMB MB';
+        }
+      }
+
+      await sink.flush();
+      await sink.close();
+      sink = null;
+
+      final downloadedBytes = await tempFile.length();
+      if (downloadedBytes < minimumValidModelBytes) {
+        throw StateError(
+          'Downloaded model is incomplete ($downloadedBytes bytes). '
+          'The partial file was kept so the download can be resumed.',
+        );
+      }
+
+      final destination = File(savePath);
+      if (await destination.exists()) {
+        await destination.delete();
+      }
+      await tempFile.rename(savePath);
+
+      statusNotifier.value = ModelDownloadStatus.downloaded;
+      progressNotifier.value = 1.0;
+      statusMessageNotifier.value = 'Model ready (Local GGUF)';
+      onComplete?.call();
+    } catch (e) {
+      await sink?.close();
+      if (e is DioException && CancelToken.isCancel(e)) {
+        statusNotifier.value = ModelDownloadStatus.paused;
+        final currentLen = await tempFile.exists() ? await tempFile.length() : 0;
+        final currentMB = (currentLen / (1024 * 1024)).toStringAsFixed(1);
+        statusMessageNotifier.value = 'Download paused ($currentMB MB saved). Tap Resume to continue.';
+      } else {
+        debugPrint('Download error: $e');
+        statusNotifier.value = ModelDownloadStatus.failed;
+        statusMessageNotifier.value = 'Download error – tap to retry.';
+        onError?.call(e.toString());
+      }
+    }
+  }
+
+  /// Pauses the ongoing model download
+  static void pauseDownload() {
+    _cancelToken?.cancel('Paused by user');
+    statusNotifier.value = ModelDownloadStatus.paused;
+  }
+
+  /// Resumes a paused download
+  static Future<void> resumeDownload({
+    VoidCallback? onComplete,
+    Function(String error)? onError,
+  }) async {
+    await startDownload(onComplete: onComplete, onError: onError);
+  }
+
+  /// Cancels the ongoing or paused model download and clears temp files
+  static Future<void> cancelDownload() async {
+    _cancelToken?.cancel('Cancelled by user');
+    try {
+      final tempPath = await getTempPath();
+      final tempFile = File(tempPath);
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    } catch (_) {}
+
+    statusNotifier.value = ModelDownloadStatus.notDownloaded;
+    progressNotifier.value = 0.0;
+    statusMessageNotifier.value = 'Download cancelled';
+  }
+
+  /// Deletes the downloaded model to reclaim disk space
+  static Future<void> deleteModel() async {
+    try {
+      final path = await getModelPath();
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      final tempPath = await getTempPath();
+      final tempFile = File(tempPath);
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+
+      statusNotifier.value = ModelDownloadStatus.notDownloaded;
+      progressNotifier.value = 0.0;
+      statusMessageNotifier.value = 'Model removed. Tap to download.';
+    } catch (e) {
+      debugPrint('Error deleting model: $e');
+    }
+  }
+}
+).firstMatch(contentRange);
+        final rangeStart = match == null ? null : int.tryParse(match.group(1)!);
+        if (rangeStart != existingLength) {
+          throw StateError('The server returned an invalid byte range; download cannot be resumed safely.');
+        }
+      }
+
       final contentLengthHeader = response.headers.value('content-length');
       final totalContentBytes = contentLengthHeader != null
           ? int.tryParse(contentLengthHeader) ?? 0
           : 0;
+      final contentRange = response.headers.value('content-range');
+      final rangeMatch = contentRange == null
+          ? null
+          : RegExp(r'^bytes (\\d+)-(\\d+)/(\\d+|\\*)
 
+      int receivedNow = 0;
+      final stream = response.data!.stream;
+
+      await for (final chunk in stream) {
+        sink.add(chunk);
+        receivedNow += chunk.length;
+        final currentTotalReceived = existingLength + receivedNow;
+
+        if (totalBytes > 0) {
+          final progress = (currentTotalReceived / totalBytes).clamp(0.0, 1.0);
+          progressNotifier.value = progress;
+          final currentMB = (currentTotalReceived / (1024 * 1024)).toStringAsFixed(1);
+          final totalMB = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
+          statusMessageNotifier.value =
+              'Downloading model: $currentMB MB / $totalMB MB (${(progress * 100).toStringAsFixed(0)}%)';
+        } else {
+          final currentMB = (currentTotalReceived / (1024 * 1024)).toStringAsFixed(1);
+          statusMessageNotifier.value = 'Downloading: $currentMB MB';
+        }
+      }
+
+      await sink.flush();
+      await sink.close();
+      sink = null;
+
+      if (await tempFile.exists()) {
+        await tempFile.rename(savePath);
+      }
+
+      statusNotifier.value = ModelDownloadStatus.downloaded;
+      progressNotifier.value = 1.0;
+      statusMessageNotifier.value = 'Model ready (Local GGUF)';
+      onComplete?.call();
+    } catch (e) {
+      await sink?.close();
+      if (e is DioException && CancelToken.isCancel(e)) {
+        statusNotifier.value = ModelDownloadStatus.paused;
+        final currentLen = await tempFile.exists() ? await tempFile.length() : 0;
+        final currentMB = (currentLen / (1024 * 1024)).toStringAsFixed(1);
+        statusMessageNotifier.value = 'Download paused ($currentMB MB saved). Tap Resume to continue.';
+      } else {
+        debugPrint('Download error: $e');
+        statusNotifier.value = ModelDownloadStatus.failed;
+        statusMessageNotifier.value = 'Download error – tap to retry.';
+        onError?.call(e.toString());
+      }
+    }
+  }
+
+  /// Pauses the ongoing model download
+  static void pauseDownload() {
+    _cancelToken?.cancel('Paused by user');
+    statusNotifier.value = ModelDownloadStatus.paused;
+  }
+
+  /// Resumes a paused download
+  static Future<void> resumeDownload({
+    VoidCallback? onComplete,
+    Function(String error)? onError,
+  }) async {
+    await startDownload(onComplete: onComplete, onError: onError);
+  }
+
+  /// Cancels the ongoing or paused model download and clears temp files
+  static Future<void> cancelDownload() async {
+    _cancelToken?.cancel('Cancelled by user');
+    try {
+      final tempPath = await getTempPath();
+      final tempFile = File(tempPath);
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    } catch (_) {}
+
+    statusNotifier.value = ModelDownloadStatus.notDownloaded;
+    progressNotifier.value = 0.0;
+    statusMessageNotifier.value = 'Download cancelled';
+  }
+
+  /// Deletes the downloaded model to reclaim disk space
+  static Future<void> deleteModel() async {
+    try {
+      final path = await getModelPath();
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      final tempPath = await getTempPath();
+      final tempFile = File(tempPath);
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+
+      statusNotifier.value = ModelDownloadStatus.notDownloaded;
+      progressNotifier.value = 0.0;
+      statusMessageNotifier.value = 'Model removed. Tap to download.';
+    } catch (e) {
+      debugPrint('Error deleting model: $e');
+    }
+  }
+}
+).firstMatch(contentRange);
+      final fullLength = rangeMatch == null || rangeMatch.group(3) == '*'
+          ? 0
+          : int.tryParse(rangeMatch.group(3)!) ?? 0;
       final totalBytes = isPartial
-          ? existingLength + totalContentBytes
+          ? (fullLength > 0 ? fullLength : existingLength + totalContentBytes)
           : totalContentBytes;
 
       if (!isPartial) {
