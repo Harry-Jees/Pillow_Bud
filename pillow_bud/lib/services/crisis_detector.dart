@@ -32,7 +32,7 @@ class CrisisDetector {
 
   /// Detects if the message contains crisis-related keywords
   static bool detect(String message) {
-    final lower = message.toLowerCase();
+    final lower = message.toLowerCase().replaceAll('’', "'");
     final allTriggers = <String>{...Constants.crisisTriggers, ..._crisisTriggers};
     for (final trigger in allTriggers) {
       final phrase = trigger.toLowerCase();
