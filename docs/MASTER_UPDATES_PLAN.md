@@ -387,3 +387,12 @@ No workflow reruns were triggered for this implementation pass. Code has been co
 - Added a regression test for unavailable-database restore and exposed the metadata-encryption helper used by legacy backup export.
 - Updated restore feedback to report the committed record counts; failures are surfaced through the existing error snackbar.
 - Verification is still pending in a Flutter-enabled environment. Do not treat source-level changes as a passing test/analyzer result.
+
+
+### Phase 3 — local inference reliability
+
+- Added single-flight model initialization so concurrent requests share one in-progress native model load instead of risking duplicate model contexts and avoidable memory pressure.
+- Serialized generation and streaming requests through one per-engine queue to prevent overlapping use of a llama.cpp context; disposal now waits for in-flight generation to finish.
+- Revalidates model size and GGUF container signature at the inference boundary, not only in the download UI, and reports invalid models through the existing recoverable error path.
+- Added lightweight tests for dummy-engine response and stream behavior.
+- Remaining high-priority verification: run formatter/analyzer/test suite in a Flutter-enabled environment, then add native-backed concurrency tests on supported desktop/Android targets. These source changes are not yet runtime-verified.
