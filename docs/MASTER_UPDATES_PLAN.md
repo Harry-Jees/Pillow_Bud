@@ -378,3 +378,12 @@ No workflow reruns were triggered for this implementation pass. Code has been co
 - Authenticated records continue to be verified by the encryption service before being returned. Records missing required IV metadata fail closed instead of being guessed as plaintext, except the explicitly identified legacy mood-label columns.
 - Added encryption regression coverage for IV-only legacy compatibility and authentication-tag tampering.
 - Remaining verification: run dart format, flutter analyze, and flutter test in a Flutter-enabled environment; review migration behavior against representative v1/v2 database fixtures before release.
+
+
+### Phase 2 follow-up — atomic backup restoration
+
+- Replaced per-row best-effort backup writes with a single SQLite transaction spanning chat messages, journal entries, and mood logs. Any schema/constraint failure now rolls back the entire import rather than leaving a partial restore.
+- Restore now fails explicitly when the database has not been initialized; it can no longer silently report success after no-op writes.
+- Added a regression test for unavailable-database restore and exposed the metadata-encryption helper used by legacy backup export.
+- Updated restore feedback to report the committed record counts; failures are surfaced through the existing error snackbar.
+- Verification is still pending in a Flutter-enabled environment. Do not treat source-level changes as a passing test/analyzer result.
