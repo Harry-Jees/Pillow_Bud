@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pillow_bud/services/system_prompt_generator.dart';
 
 void main() {
-  group('SystemPromptGenerator Tests', () {
-    test('Generates prompt with base rules, user name, and safety boundaries', () {
+  group('SystemPromptGenerator', () {
+    test('Includes user context, voice rules, emotion, and safety guidance', () {
       final prompt = SystemPromptGenerator.generatePrompt(
         userName: 'Alex',
         personalityMode: 'balanced',
@@ -12,41 +12,45 @@ void main() {
         recentContext: null,
       );
 
-      expect(prompt.contains('Alex'), isTrue);
-      expect(prompt.contains('NOT:'), isTrue);
-      expect(prompt.contains('A therapist'), isTrue);
-      expect(prompt.contains('BALANCED MODE:'), isTrue);
-      expect(prompt.contains('RESPONSE TO ANXIETY'), isTrue);
-      expect(prompt.contains('CRISIS DETECTION:'), isTrue);
+      expect(prompt, contains('Alex'));
+      expect(prompt, contains('VOICE DNA:'));
+      expect(prompt, contains('Balanced mode:'));
+      expect(prompt, contains('Emotion: anxious'));
+      expect(prompt, contains('SAFETY:'));
+      expect(prompt, contains('Do not diagnose'));
     });
 
-    test('Personality modes change prompt guidance accurately', () {
-      final gentlePrompt = SystemPromptGenerator.generatePrompt(
-        userName: 'Sam',
-        personalityMode: 'gentle',
-        detectedEmotion: 'sad',
-        emotionIntensity: 0.5,
-        recentContext: null,
-      );
-      expect(gentlePrompt.contains('GENTLE MODE:'), isTrue);
+    test('Personality modes change guidance accurately', () {
+      for (final mode in ['gentle', 'curious', 'wise', 'balanced']) {
+        final prompt = SystemPromptGenerator.generatePrompt(
+          userName: 'Sam',
+          personalityMode: mode,
+          detectedEmotion: 'sad',
+          emotionIntensity: 0.5,
+          recentContext: null,
+        );
+        expect(prompt.toLowerCase(), contains('$mode mode:'));
+      }
+    });
 
-      final curiousPrompt = SystemPromptGenerator.generatePrompt(
+    test('Includes recent context and uses None for absent context', () {
+      final withContext = SystemPromptGenerator.generatePrompt(
         userName: 'Sam',
-        personalityMode: 'curious',
-        detectedEmotion: 'sad',
-        emotionIntensity: 0.5,
-        recentContext: null,
+        personalityMode: 'balanced',
+        detectedEmotion: 'calm',
+        emotionIntensity: 0.2,
+        recentContext: 'User: I had a hard day.',
       );
-      expect(curiousPrompt.contains('CURIOUS MODE:'), isTrue);
+      expect(withContext, contains('User: I had a hard day.'));
 
-      final wisePrompt = SystemPromptGenerator.generatePrompt(
+      final withoutContext = SystemPromptGenerator.generatePrompt(
         userName: 'Sam',
-        personalityMode: 'wise',
-        detectedEmotion: 'sad',
-        emotionIntensity: 0.5,
+        personalityMode: 'balanced',
+        detectedEmotion: 'calm',
+        emotionIntensity: 0.2,
         recentContext: null,
       );
-      expect(wisePrompt.contains('WISE MODE:'), isTrue);
+      expect(withoutContext, contains('RECENT CONTEXT:\nNone'));
     });
   });
 }

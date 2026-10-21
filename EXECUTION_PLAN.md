@@ -1,23 +1,12 @@
-# Guidance Execution Plan
+# Maintenance execution plan
 
-## Completed
+1. Fix security-sensitive key handling and record authentication.
+2. Make database initialization failures visible instead of continuing with unavailable persistence.
+3. Encrypt sensitive metadata in new database writes while retaining a legacy-read path.
+4. Align model configuration with the actual Qwen GGUF download.
+5. Remove stale scaffolding and consolidate documentation around the actual implementation.
+6. Run formatting, static analysis, tests, and native builds; record exact results before merging.
 
-1. Read every markdown file in `guidance/`.
-2. Generated missing Flutter Android/iOS/test platform structure.
-3. Implemented the complete emotion-aware mock AI system from `COMPLETE_AI_LLM_INTEGRATION.md`.
-4. Added platform app identity and package configuration from `APP_CONFIGURATION_AND_ICON.md`.
-5. Generated Android and iOS launcher icons locally.
-6. Added current-resolving dependencies and regenerated `pubspec.lock`.
-7. Cleaned analyzer issues, formatted Dart, and updated the generated widget test.
-8. Verified:
-   - `flutter analyze`: no issues found.
-   - `flutter test`: all tests passed.
+## Verification status
 
-## Blocked/External
-
-1. Android APK build still needs a stable local Gradle run.
-   - `JAVA_HOME` can use `D:\Java\jdk17`.
-   - `GRADLE_USER_HOME` should use `D:\gradle-cache` because C: has no free space.
-   - Last build attempt timed out before producing an APK.
-2. Device install/home-screen icon verification needs a connected Android or iOS device.
-3. GitHub push/release tasks need repository credentials and a chosen remote.
+Source changes have been made on a maintenance branch. Flutter tooling has not been run in this environment, so the changes are not yet verified by analyzer, tests, or platform builds. Do not describe the branch as production-ready until those checks pass.

@@ -1,119 +1,63 @@
-﻿# Pillow Bud 🛏️
+# Pillow Bud
 
-Your emotional companion, always listening.
+Pillow Bud is a Flutter emotional-wellness companion with chat, journaling, mood tracking, breathing and meditation exercises, personalization, optional biometric locking, and crisis-resource guidance.
 
-Pillow Bud is a free, open-source emotional wellness companion built with Flutter. It includes chat, journaling, mood tracking, breathing exercises, and crisis resources. The optional on-device language model downloads separately, so it does not inflate the app install package.
+> **Important:** Pillow Bud is not a medical service, therapist, or emergency response service. It can make mistakes and should not be relied on for crisis intervention.
+
+## Repository layout
+
+- `pillow_bud/` — the actual Flutter application.
+- `docs/ARCHITECTURE.md` — implementation overview and known platform limits.
+- `SECURITY.md` — how to report security issues.
+- `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` — community guidance.
+
+The root is documentation-only. Run Flutter commands from `pillow_bud/`.
 
 ## Features
 
-- 💬 Chat with Bud — An AI companion that listens without judgment
-- 📓 Journal — Write your thoughts privately
-- 😌 Mood Tracking — Track how you're feeling over time
-- 🆘 Crisis Detection — Shows crisis resources when needed
-- 🎨 Customizable — Choose themes and colors
-- 100% Private — Everything stays on your phone
-- 100% Free — No costs, no subscriptions
+- Conversational companion powered by an optional downloaded local GGUF model (currently Qwen3 4B Instruct).
+- Journaling, mood history, and insights.
+- Guided breathing and meditation screens.
+- Personality and theme preferences.
+- Optional biometric app lock and voice input.
+- Local notifications and data export/import.
+- Crisis phrase detection with support-resource messaging.
 
-## Privacy First
+## Requirements
 
-- **100% Local Processing** — All data stays on your phone
-- **No Cloud** — No servers, no external calls
-- **Encrypted** — Data is encrypted by default
-- **Open Source** — Code is transparent and auditable
+Install a compatible Flutter SDK and platform toolchains. The project targets Flutter-supported Android, iOS, Windows, macOS, and Linux builds where all required plugins are supported. Web is not considered supported because local inference and several services rely on native APIs.
 
-## Getting Started
+## Run locally
 
-### Prerequisites
-
-- Flutter 3.0+ installed
-- Android Studio or Xcode
-- A smartphone (Android 8+ or iOS 15+)
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/pillow-bud.git
-cd pillow-bud
-```
-
-2. Enter the Flutter app directory and install dependencies:
 ```bash
 cd pillow_bud
 flutter pub get
-```
-
-3. Connect your phone via USB (or use emulator)
-
-4. Run the app:
-```bash
+flutter analyze
+flutter test
 flutter run
 ```
 
-## First-Time Setup
+The local model is a separate, large download. Download it only from the in-app model settings. Confirm sufficient free storage before starting.
 
-1. When you open the app, complete the onboarding (2 minutes)
-2. Enter your name and choose Bud's personality
-3. Start chatting!
+## Android release signing
 
-The local AI model is downloaded on demand from the profile screen. It is a large download and needs additional free storage.
+Release builds must use a private upload keystore configured in `pillow_bud/android/key.properties`. See the official [Flutter Android release guide](https://docs.flutter.dev/deployment/android). Never commit the keystore or its passwords.
 
-## Building
+## Privacy and security
 
-### Android
-```bash
-flutter build apk --release --split-per-abi
-```
+- Chat and journal content is encrypted before database persistence.
+- New database records use AES-CBC with HMAC-SHA256 authentication; older records remain readable for migration and are not authenticated.
+- Mood labels are encrypted in newly written database records.
+- Non-sensitive preferences use platform preferences; serialized chat and journal payloads are encrypted there too. Exported backups are not encrypted.
+- Exported backups are Base64-encoded, **not encrypted**. They are bound to the installation key and cannot currently be restored on a different installation. Treat them as sensitive.
+- Local inference does not require a hosted AI endpoint, but downloading the model requires a network connection.
 
-This creates a smaller APK for each Android CPU architecture under `pillow_bud/build/app/outputs/flutter-apk/`. Install the APK matching the device. The release build also shrinks code and resources.
+Read [SECURITY.md](SECURITY.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making security or persistence changes.
 
-### iOS
-```bash
-flutter build ios --release
-```
+## Community
 
-## Important Disclaimer
-
-**Pillow Bud is not a substitute for professional mental health care.**
-
-Bud is an emotional companion, not a licensed therapist. For serious mental health concerns, please speak with a mental health professional.
-
-If you're in crisis, please reach out to:
-- **iCall India:** 9152987821
-- **Vandrevala Foundation:** 1860-2662-345
-- **AASRA:** 9820466726
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## License
 
-This project is licensed under the Apache 2.0 License - see the LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please read CONTRIBUTING.md for details on how to help.
-
-## Support
-
-- 💙 Enjoying Pillow Bud? Star this repo!
-- 🐛 Found a bug? Open an issue
-- 💡 Have ideas? Discussions welcome
-
-## Built With
-
-- **Flutter** — UI framework
-- **Riverpod** — State management
-- **Isar** — Local database
-- **flutter_gemma** — AI integration
-
-## Roadmap
-
-- [ ] Integrate real Llama 3.2 1B model
-- [ ] Isar database for persistent storage
-- [ ] Advanced mood analytics
-- [x] Meditation guides
-- [ ] Peer community features (optional, privacy-first)
-
----
-
-Made with ❤️ for people who need a listening ear.
-
-**Remember: You are not alone. You matter. 💙**
+Apache-2.0. See [LICENSE](LICENSE).

@@ -278,13 +278,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _exportBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export an unencrypted backup?'),
+        content: const Text(
+          'The current backup file is not encrypted. It may contain private '
+          'chat, journal, and mood data. Only save or share it somewhere you trust.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Export anyway'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isExporting = true);
     try {
       final file = await BackupService.exportData();
       await Share.shareXFiles(
         [XFile(file.path)],
         subject: 'Pillow Bud Backup',
-        text: 'Here is your encrypted Pillow Bud backup.',
+        text: 'Pillow Bud backup — this file is not encrypted. Keep it private.',
       );
     } catch (e) {
       if (mounted) {

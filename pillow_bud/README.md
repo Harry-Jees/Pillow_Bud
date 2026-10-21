@@ -1,17 +1,36 @@
-# pillow_bud
+# Pillow Bud Flutter application
 
-A new Flutter project.
+This directory contains the Flutter app source and platform projects.
 
-## Getting Started
+## Prerequisites
 
-This project is a starting point for a Flutter application.
+- Flutter SDK compatible with the Dart SDK constraint in `pubspec.yaml`
+- Android Studio / Android SDK for Android builds
+- Xcode for iOS and macOS builds
+- The relevant desktop toolchain for Windows or Linux
 
-A few resources to get you started if this is your first Flutter project:
+## Setup
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Local AI
+
+The app currently downloads the Qwen3 4B Instruct quantized GGUF model through `ModelDownloadService` and runs it through `llama_cpp` on supported native platforms. The model is large and requires additional storage and memory. Model download is not needed to compile the app, but AI chat requires a valid downloaded model.
+
+## Platform support
+
+Native platforms are the intended target. Web support is not guaranteed because local inference, file access, secure storage, and database services rely on platform-specific APIs.
+
+## Security notes
+
+- Secure key storage is required for encrypted database records; encryption must fail closed if the OS secure store is unavailable.
+- Existing records written by older versions may use unauthenticated encryption.
+- The current backup export is Base64-encoded rather than encrypted. Treat exported files as sensitive.
+- Release Android builds require a private signing configuration in `android/key.properties`.
+
+See the repository root README and `../docs/ARCHITECTURE.md` for the project overview.

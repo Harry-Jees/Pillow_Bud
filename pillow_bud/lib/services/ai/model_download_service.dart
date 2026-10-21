@@ -15,6 +15,10 @@ enum ModelDownloadStatus {
 }
 
 class ModelDownloadService {
+  // A Q4_K_M 4B model is measured in gigabytes; tiny/truncated files must not
+  // be treated as a usable model.
+  static const int minimumValidModelBytes = 1024 * 1024 * 1024;
+
   static const String modelFileName = 'Qwen3-4B-Instruct-2507-Q4_K_M.gguf';
   static const String defaultModelUrl =
       'https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf';
@@ -61,7 +65,7 @@ class ModelDownloadService {
       final exists = await file.exists();
       if (exists) {
         final length = await file.length();
-        if (length > 10 * 1024 * 1024) {
+        if (length >= minimumValidModelBytes) {
           statusNotifier.value = ModelDownloadStatus.downloaded;
           progressNotifier.value = 1.0;
           statusMessageNotifier.value = 'Qwen3 4B Instruct (Local GGUF Ready)';

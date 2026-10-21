@@ -33,7 +33,7 @@ class LLMService {
     if (!isDownloaded) {
       return '⚠️ The AI model hasn\'t been downloaded yet.\n\n'
           'Go to **Profile & Settings → On-Device AI Model** and tap '
-          '"Download Model (~700 MB)" to get started.';
+          '"Download Model (~2.5 GB)" to get started.';
     }
 
     // 3. Emotional Analysis & Intensity Scoring
@@ -190,7 +190,10 @@ class LLMService {
 
   String _getRecentContext() {
     if (conversationHistory.isEmpty) return 'No recent conversation.';
-    return conversationHistory.take(6).map((m) {
+    final recent = conversationHistory.length > 6
+        ? conversationHistory.sublist(conversationHistory.length - 6)
+        : conversationHistory;
+    return recent.map((m) {
       final role = m['role'] == 'user' ? 'User' : 'Bud';
       return '$role: ${m['content']}';
     }).join('\n');

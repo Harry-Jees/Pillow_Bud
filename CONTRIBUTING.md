@@ -1,52 +1,34 @@
-﻿# Contributing to Pillow Bud 💙
+# Contributing to Pillow Bud
 
-First off, thanks for thinking about contributing! We're excited to have community involvement.
+Thanks for helping improve Pillow Bud. Changes should protect user privacy, preserve accessibility, and avoid overstating mental-health or security capabilities.
 
-## Code of Conduct
+## Before opening a pull request
 
-Be respectful. Pillow Bud is about emotional support. Everyone in this community should feel safe and respected.
+1. Open an issue or describe the bug/feature in the PR.
+2. Create a focused branch.
+3. Keep changes scoped and avoid unrelated UI changes.
+4. Add or update tests for behavior changes, especially encryption, persistence, AI safety, and migrations.
+5. Run from `pillow_bud/`:
 
-## How Can I Contribute?
+   ```bash
+   flutter pub get
+   dart format lib test
+   flutter analyze
+   flutter test
+   ```
 
-### Reporting Bugs
+6. State which commands actually ran and include their results. Do not report checks as passing if they were not executed.
 
-- Check if the bug is already reported
-- Be specific and include:
-  - Steps to reproduce
-  - Expected behavior
-  - Actual behavior
-  - Device/OS info
+## Engineering guidelines
 
-### Suggesting Features
+- Follow Dart style and Flutter conventions.
+- Prefer small, testable services and explicit error handling.
+- Never log private user content, keys, tokens, or backup contents.
+- Never add secrets, signing keys, keystores, personal data, or generated build artifacts.
+- Do not introduce cloud processing for private conversations without explicit product approval and clear disclosure.
+- Changes to encryption or database schema require compatibility and migration tests.
+- Treat crisis handling as a safety-critical path; avoid presenting the app as a therapist or emergency service.
 
-- Check if it's already suggested
-- Explain the feature and why it would help
-- Include use cases if possible
+## Pull requests
 
-### Code Contributions
-
-1. Fork the repository
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Make your changes
-4. Test thoroughly
-5. Commit with clear messages
-6. Push and create a Pull Request
-
-## Code Style
-
-- Follow Dart conventions
-- Use meaningful variable names
-- Comment complex logic
-- Keep functions small and focused
-
-## Testing
-
-- Test on both Android and iOS if possible
-- Test on different device sizes
-- Test on different OS versions
-
-## Remember
-
-This is about helping people. Be thoughtful about changes that affect user experience or mental health safety.
-
-Thank you for contributing! 🙏
+Explain the motivation, implementation, tests, migration impact, and known limitations. Keep documentation aligned with actual code.

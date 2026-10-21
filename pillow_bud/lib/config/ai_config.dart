@@ -1,36 +1,29 @@
-/// AI Configuration - Llama 3.2 1B with emotional intelligence
+/// Configuration for the local Qwen3 4B Instruct GGUF model.
 class AIConfig {
-  // Model Info
-  static const String modelName = 'Llama 3.2 1B';
-  static const String modelSize = '~700 MB';
+  static const String modelName = 'Qwen3 4B Instruct';
+  static const String modelSize = '~2.5 GB (quantized GGUF)';
   static const String modelFormat = 'GGUF';
-  static const int contextWindow = 8192;
+  static const int contextWindow = 2048;
 
-  // Model Download URL (from Hugging Face)
-  // Replace with actual model URL when available
+  // Kept aligned with ModelDownloadService.defaultModelUrl.
   static const String modelDownloadUrl =
-      'https://huggingface.co/models/meta-llama/Llama-3.2-1B-Instruct-GGUF/resolve/main/llama-3.2-1b-instruct-q4_k_m.gguf';
+      'https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf';
 
-  // Local storage paths
-  static const String modelStorageKey = 'llama_model_path';
+  static const String modelStorageKey = 'qwen3_model_path';
 
-  // Generation Parameters
   static const int maxTokens = 300;
-  static const double temperature = 0.8; // Warm and creative
-  static const double topP = 0.95;
-  static const double topK = 40;
-  static const int repeatPenalty = 1;
+  static const double temperature = 0.7;
+  static const double topP = 0.9;
+  static const int topK = 40;
+  static const double repeatPenalty = 1.0;
 
-  // Response timing (milliseconds)
-  static const int thinkingDelay = 120; // Keep the interface feeling responsive
-  static const int streamingDelay = 50; // Delay between tokens
+  static const int thinkingDelay = 120;
+  static const int streamingDelay = 50;
 
-  // Safety & Content Filtering
   static const bool enableSafetyFilter = true;
   static const int maxResponseLength = 500;
   static const int minResponseLength = 20;
 
-  // Emotional States Supported
   static const List<String> emotionalStates = [
     'overwhelmed',
     'anxious',
@@ -44,7 +37,6 @@ class AIConfig {
     'uncertain',
   ];
 
-  // Bud Personality Modes
   static const Map<String, String> personalityModes = {
     'gentle': 'Soft, validating, focused on listening',
     'curious': 'Asks exploratory questions, helps think deeper',

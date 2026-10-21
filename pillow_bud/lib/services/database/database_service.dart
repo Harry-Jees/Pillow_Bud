@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -8,8 +9,8 @@ import 'package:pillow_bud/models/user_preference.dart';
 import 'package:pillow_bud/services/encryption/encryption_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-/// Lightweight SQLite3 Database Service with transparent column-level AES-256 encryption.
-/// Fully compatible with Android, iOS, Windows, macOS, Linux, and Web.
+/// SQLite persistence with authenticated encryption for sensitive record fields.
+/// The database service uses native/FFI APIs and is not Web-compatible.
 class DatabaseService {
   static Database? _db;
 
@@ -28,11 +29,13 @@ class DatabaseService {
 
       _db = await openDatabase(
         dbPath,
-        version: 1,
+        version: 2,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       );
-    } catch (e) {
-      debugPrint('DatabaseService initialization warning: $e');
+    } catch (e, stackTrace) {
+      debugPrint('DatabaseService initialization failed: $e');
+      Error.throwWithStackTrace(e, stackTrace);
     }
   }
 
@@ -49,6 +52,7 @@ class DatabaseService {
         iv TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
         mood TEXT,
+        mood_iv TEXT,
         intensity REAL
       )
     ''');
@@ -60,6 +64,7 @@ class DatabaseService {
         ciphertext TEXT NOT NULL,
         iv TEXT NOT NULL,
         mood TEXT NOT NULL,
+        mood_iv TEXT,
         created_at INTEGER NOT NULL,
         modified_at INTEGER NOT NULL
       )
@@ -80,6 +85,7 @@ class DatabaseService {
       CREATE TABLE IF NOT EXISTS mood_logs (
         id TEXT PRIMARY KEY,
         mood TEXT NOT NULL,
+        mood_iv TEXT,
         timestamp INTEGER NOT NULL,
         note_ciphertext TEXT,
         iv TEXT
@@ -87,11 +93,20 @@ class DatabaseService {
     ''');
   }
 
+  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE chat_messages ADD COLUMN mood_iv TEXT');
+      await db.execute('ALTER TABLE journal_entries ADD COLUMN mood_iv TEXT');
+      await db.execute('ALTER TABLE mood_logs ADD COLUMN mood_iv TEXT');
+    }
+  }
+
   // ==================== CHAT MESSAGES ====================
 
   static Future<void> saveChatMessage(ChatMessage message, {String? mood, double? intensity}) async {
     if (!isInitialized) return;
     final encrypted = await EncryptionService.encrypt(message.text);
+    final encryptedMood = mood == null ? null : await EncryptionService.encrypt(mood);
 
     await _db!.insert(
       'chat_messages',
@@ -102,7 +117,8 @@ class DatabaseService {
         'ciphertext': encrypted['ciphertext']!,
         'iv': encrypted['iv']!,
         'timestamp': message.timestamp.millisecondsSinceEpoch,
-        'mood': mood,
+        'mood': encryptedMood?['ciphertext'],
+        'mood_iv': encryptedMood?['iv'],
         'intensity': intensity,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -157,6 +173,7 @@ class DatabaseService {
   static Future<void> saveJournalEntry(JournalEntry entry) async {
     if (!isInitialized) return;
     final encrypted = await EncryptionService.encrypt(entry.text);
+    final encryptedMood = await EncryptionService.encrypt(entry.mood);
 
     await _db!.insert(
       'journal_entries',
@@ -164,7 +181,8 @@ class DatabaseService {
         'id': entry.id,
         'ciphertext': encrypted['ciphertext']!,
         'iv': encrypted['iv']!,
-        'mood': entry.mood,
+        'mood': encryptedMood['ciphertext'],
+        'mood_iv': encryptedMood['iv'],
         'created_at': entry.dateCreated.millisecondsSinceEpoch,
         'modified_at': entry.dateModified.millisecondsSinceEpoch,
       },
@@ -184,10 +202,18 @@ class DatabaseService {
         ivBase64: row['iv'] as String,
       );
 
+      final moodIv = row['mood_iv'] as String?;
+      final mood = moodIv == null || moodIv.isEmpty
+          ? row['mood'] as String
+          : await EncryptionService.decrypt(
+              ciphertext: row['mood'] as String,
+              ivBase64: moodIv,
+            );
+
       entries.add(JournalEntry(
         id: row['id'] as String,
         text: text,
-        mood: row['mood'] as String,
+        mood: mood,
         dateCreated: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
         dateModified: DateTime.fromMillisecondsSinceEpoch(row['modified_at'] as int),
       ));
@@ -215,7 +241,7 @@ class DatabaseService {
       'onboardingCompletedAt': pref.onboardingCompletedAt?.toIso8601String(),
     };
 
-    final encrypted = await EncryptionService.encrypt(rawJson.toString());
+    final encrypted = await EncryptionService.encrypt(jsonEncode(rawJson));
 
     await _db!.insert(
       'user_preferences',
@@ -234,12 +260,14 @@ class DatabaseService {
   static Future<void> logMood(String mood, {String? note}) async {
     if (!isInitialized) return;
     final encrypted = note != null && note.isNotEmpty ? await EncryptionService.encrypt(note) : null;
+    final encryptedMood = await EncryptionService.encrypt(mood);
 
     await _db!.insert(
       'mood_logs',
       {
         'id': DateTime.now().microsecondsSinceEpoch.toString(),
-        'mood': mood,
+        'mood': encryptedMood['ciphertext'],
+        'mood_iv': encryptedMood['iv'],
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'note_ciphertext': encrypted?['ciphertext'],
         'iv': encrypted?['iv'],
@@ -250,7 +278,21 @@ class DatabaseService {
 
   static Future<List<Map<String, dynamic>>> getMoodHistory() async {
     if (!isInitialized) return [];
-    return await _db!.query('mood_logs', orderBy: 'timestamp DESC', limit: 30);
+    final rows = await _db!.query('mood_logs', orderBy: 'timestamp DESC', limit: 30);
+    final result = <Map<String, dynamic>>[];
+    for (final source in rows) {
+      final row = Map<String, dynamic>.from(source);
+      final moodIv = row['mood_iv'] as String?;
+      // Rows created before schema v2 stored mood labels in plaintext.
+      if (moodIv != null && moodIv.isNotEmpty) {
+        row['mood'] = await EncryptionService.decrypt(
+          ciphertext: row['mood'] as String,
+          ivBase64: moodIv,
+        );
+      }
+      result.add(row);
+    }
+    return result;
   }
 
   // ==================== RAW-ROW HELPERS (for BackupService) ====================
@@ -265,6 +307,12 @@ class DatabaseService {
   static Future<List<Map<String, dynamic>>> getRawJournalEntryRows() async {
     if (!isInitialized) return [];
     return await _db!.query('journal_entries', orderBy: 'created_at DESC');
+  }
+
+  /// Returns raw mood rows so exports never replace encrypted labels with plaintext.
+  static Future<List<Map<String, dynamic>>> getRawMoodRows() async {
+    if (!isInitialized) return [];
+    return await _db!.query('mood_logs', orderBy: 'timestamp DESC');
   }
 
   /// Generic INSERT OR REPLACE – used by BackupService during import to restore
