@@ -35,7 +35,7 @@ void main() {
     try {
       await file.writeAsString('PBv2:${base64Encode(utf8.encode(payload))}');
       await expectLater(
-        BackupService.importData(file),
+        BackupService.importData(file, passphrase: 'test-passphrase'),
         throwsA(isA<StateError>()),
       );
     } finally {
@@ -58,7 +58,7 @@ void main() {
     try {
       await file.writeAsString('PBv2:${base64Encode(utf8.encode(payload))}');
       await expectLater(
-        BackupService.importData(file),
+        BackupService.importData(file, passphrase: 'test-passphrase'),
         throwsA(isA<FormatException>()),
       );
     } finally {
@@ -81,7 +81,7 @@ void main() {
     try {
       await file.writeAsString('PBv2:${base64Encode(utf8.encode(payload))}');
       await expectLater(
-        BackupService.importData(file),
+        BackupService.importData(file, passphrase: 'test-passphrase'),
         throwsA(isA<FormatException>()),
       );
     } finally {
