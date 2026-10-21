@@ -278,35 +278,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _exportBackup() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Export an unencrypted backup?'),
-        content: const Text(
-          'The current backup file is not encrypted. It may contain private '
-          'chat, journal, and mood data. Only save or share it somewhere you trust.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Export anyway'),
-          ),
-        ],
-      ),
+    final passphrase = await _requestBackupPassphrase(
+      title: 'Protect your backup',
+      description: 'Create a passphrase with at least 10 characters. You will need it to restore this backup on any device. Pillow Bud cannot recover a forgotten passphrase.',
+      confirm: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (passphrase == null || !mounted) return;
 
     setState(() => _isExporting = true);
     try {
-      final file = await BackupService.exportData();
+      final file = await BackupService.exportData(passphrase: passphrase);
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'Pillow Bud Backup',
-        text: 'Pillow Bud backup — this file is not encrypted. Keep it private.',
+        subject: 'Pillow Bud Encrypted Backup',
+        text: 'Pillow Bud encrypted backup. Keep your passphrase separate and private.',
       );
     } catch (e) {
       if (mounted) {
@@ -317,6 +302,84 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
+  }
+
+  Future<String?> _requestBackupPassphrase({
+    required String title,
+    required String description,
+    required bool confirm,
+  }) async {
+    final controller = TextEditingController();
+    final confirmation = TextEditingController();
+    String? result;
+    try {
+      result = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(description),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  obscureText: true,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Backup passphrase',
+                    helperText: 'At least 10 characters',
+                  ),
+                ),
+                if (confirm) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: confirmation,
+                    obscureText: true,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm passphrase',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = controller.text;
+                if (value.trim().length < 10 ||
+                    (confirm && value != confirmation.text)) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(value.trim().length < 10
+                          ? 'Use at least 10 characters.'
+                          : 'The passphrases do not match.'),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, value);
+              },
+              child: Text(confirm ? 'Encrypt Backup' : 'Unlock Backup'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+      confirmation.dispose();
+    }
+    return result;
   }
 
   Future<void> _importBackup() async {
