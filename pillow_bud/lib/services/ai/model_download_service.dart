@@ -54,6 +54,26 @@ class ModelDownloadService {
     return '${await getModelPath()}.download';
   }
 
+  /// Checks the GGUF container signature, not just the file extension or size.
+  /// Full model identity/checksum verification remains a release-hardening task.
+  static Future<bool> hasGgufMagic(File file) async {
+    RandomAccessFile? handle;
+    try {
+      if (!await file.exists() || await file.length() < 4) return false;
+      handle = await file.open(mode: FileMode.read);
+      final header = await handle.read(4);
+      return header.length == 4 &&
+          header[0] == 0x47 && // G
+          header[1] == 0x47 && // G
+          header[2] == 0x55 && // U
+          header[3] == 0x46; // F
+    } catch (_) {
+      return false;
+    } finally {
+      await handle?.close();
+    }
+  }
+
   /// Checks the final model file and reports partial downloads as resumable.
   static Future<bool> isModelDownloaded() async {
     try {
@@ -61,14 +81,14 @@ class ModelDownloadService {
       final file = File(path);
       if (await file.exists()) {
         final length = await file.length();
-        if (length >= minimumValidModelBytes) {
+        if (length >= minimumValidModelBytes && await hasGgufMagic(file)) {
           statusNotifier.value = ModelDownloadStatus.downloaded;
           progressNotifier.value = 1.0;
           statusMessageNotifier.value = 'Qwen3 4B Instruct (Local GGUF Ready)';
           return true;
         }
 
-        // Older versions could leave a truncated file at the final path.
+        // Reject truncated or non-GGUF files left at the final path.
         await file.delete();
       }
 
@@ -232,6 +252,13 @@ class ModelDownloadService {
           'Downloaded model is incomplete or has an unexpected size '
           '($downloadedBytes bytes; expected $expectedSize). '
           'The partial file was kept so the download can be resumed.',
+        );
+      }
+
+      if (!await hasGgufMagic(tempFile)) {
+        throw StateError(
+          'The downloaded file is not a valid GGUF container. '
+          'The partial file was kept for inspection or retry.',
         );
       }
 
