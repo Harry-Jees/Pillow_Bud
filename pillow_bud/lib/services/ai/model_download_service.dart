@@ -24,6 +24,9 @@ class ModelDownloadService {
 
   static final Dio _dio = Dio();
   static CancelToken? _cancelToken;
+  // A single temporary file and cancellation token are shared by this service.
+  // Serialize starts so two screens/taps cannot corrupt a resume in progress.
+  static Future<void>? _activeDownload;
 
   static final ValueNotifier<ModelDownloadStatus> statusNotifier =
       ValueNotifier(ModelDownloadStatus.notDownloaded);
@@ -111,9 +114,31 @@ class ModelDownloadService {
     return false;
   }
 
-  /// Starts or resumes a download. A partial response is appended only when
-  /// the server confirms that its byte range starts at the saved file length.
+  /// Starts or resumes one download operation at a time. All callers that
+  /// arrive while a transfer is active share its future instead of opening a
+  /// second writer against the same temporary file.
   static Future<void> startDownload({
+    String? url,
+    VoidCallback? onComplete,
+    Function(String error)? onError,
+  }) {
+    final active = _activeDownload;
+    if (active != null) return active;
+
+    final operation = _startDownloadInternal(
+      url: url,
+      onComplete: onComplete,
+      onError: onError,
+    );
+    _activeDownload = operation;
+    return operation.whenComplete(() {
+      if (identical(_activeDownload, operation)) _activeDownload = null;
+    });
+  }
+
+  /// A partial response is appended only when the server confirms that its
+  /// byte range starts at the saved file length.
+  static Future<void> _startDownloadInternal({
     String? url,
     VoidCallback? onComplete,
     Function(String error)? onError,
