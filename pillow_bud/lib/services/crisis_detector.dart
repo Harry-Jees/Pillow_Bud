@@ -77,10 +77,10 @@ Please know that your life matters, you are not alone, and there is real support
 
 Please reach out to one of these free, confidential helplines:
 
-🆘 iCall Psychosocial Helpline: 9152987821 (Mon-Sat, 8am-10pm)
-🆘 Vandrevala Foundation: +91 9999 666 555 / 1860-2662-345 (24/7)
-🆘 AASRA Suicide Prevention: 9820466726 (24/7)
-🆘 Tele-MANAS (Govt of India): 14416 (24/7 Toll-Free)
+🆘 Tele-MANAS (Govt. of India): 14416 or 1800-891-4416 (24/7, free)
+🆘 Vandrevala Foundation: +91 9999 666 555 (24/7)
+🆘 AASRA: 9820466728
+🆘 Immediate danger in India: 112
 
 You deserve compassionate, professional support. Please reach out to them now. 💙''';
   }
