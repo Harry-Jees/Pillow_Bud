@@ -95,7 +95,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || ref.read(isLoadingChatProvider)) return;
 
     final sessionId = ref.read(currentChatIdProvider);
     final isCrisis = CrisisDetector.detect(text);
@@ -123,6 +123,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _controller.clear();
     setState(() => _hasInput = false);
     _scrollToBottom();
+    // Lock out rapid repeat submissions while the user turn is being saved
+    // and generated. The lock is reset in finally (or dispose).
+    ref.read(isLoadingChatProvider.notifier).state = true;
 
     // Persist encrypted to SQLite3
     try {
@@ -142,7 +145,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     // Trigger Bud generation
-    ref.read(isLoadingChatProvider.notifier).state = true;
     _scrollToBottom();
 
     try {
