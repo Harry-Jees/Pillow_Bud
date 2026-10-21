@@ -190,10 +190,7 @@ class InsightsScreen extends ConsumerWidget {
                               color: isDarkMode
                                   ? Colors.white.withValues(alpha: 0.08)
                                   : Colors.black.withValues(alpha: 0.05),
-                              child: FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor: score,
-                                child: TweenAnimationBuilder<double>(
+                              child: TweenAnimationBuilder<double>(
                                   tween: Tween(begin: 0.0, end: score),
                                   duration: MediaQuery.maybeOf(context)?.disableAnimations == true
                                       ? Duration.zero
@@ -209,7 +206,6 @@ class InsightsScreen extends ConsumerWidget {
                                       ),
                                     ),
                                   ),
-                                ),
                               ),
                             ),
                           ),
