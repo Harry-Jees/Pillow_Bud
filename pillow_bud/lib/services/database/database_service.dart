@@ -394,6 +394,39 @@ class DatabaseService {
     return await _db!.query('mood_logs', orderBy: 'timestamp DESC');
   }
 
+  /// Restores a validated set of raw encrypted rows atomically.
+  ///
+  /// If any row violates the database schema, SQLite rolls back every table
+  /// write. This prevents a backup import from leaving a half-restored database.
+  static Future<void> restoreRawRowsTransaction({
+    required Map<String, List<Map<String, dynamic>>> rowsByTable,
+  }) async {
+    if (!isInitialized) {
+      throw StateError('DatabaseService must be initialized before restoring a backup.');
+    }
+
+    const allowedTables = <String>{
+      'chat_messages',
+      'journal_entries',
+      'mood_logs',
+    };
+    if (rowsByTable.keys.any((table) => !allowedTables.contains(table))) {
+      throw ArgumentError('Backup contains an unsupported database table.');
+    }
+
+    await _db!.transaction((txn) async {
+      for (final entry in rowsByTable.entries) {
+        for (final row in entry.value) {
+          await txn.insert(
+            entry.key,
+            row,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      }
+    });
+  }
+
   /// Generic INSERT OR REPLACE – used by BackupService during import to restore
   /// already-encrypted rows without re-encrypting them.
   static Future<void> insertRawRow({
