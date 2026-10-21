@@ -10,9 +10,26 @@ void main() {
       expect(path.endsWith('.gguf'), isTrue);
     });
 
-    test('Initial download status is notDownloaded or valid state', () {
-      expect(ModelDownloadService.statusNotifier.value, isA<ModelDownloadStatus>());
-      expect(ModelDownloadService.progressNotifier.value, inInclusiveRange(0.0, 1.0));
+    test('A valid model must be at least 1 GiB', () {
+      expect(
+        ModelDownloadService.minimumValidModelBytes,
+        greaterThanOrEqualTo(1024 * 1024 * 1024),
+      );
+      expect(
+        ModelDownloadService.modelFileName.endsWith('.gguf'),
+        isTrue,
+      );
+    });
+
+    test('Initial download status is a valid state', () {
+      expect(
+        ModelDownloadService.statusNotifier.value,
+        isA<ModelDownloadStatus>(),
+      );
+      expect(
+        ModelDownloadService.progressNotifier.value,
+        inInclusiveRange(0.0, 1.0),
+      );
     });
 
     test('Cancel download resets progress safely', () async {
