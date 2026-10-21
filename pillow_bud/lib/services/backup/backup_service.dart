@@ -31,41 +31,52 @@ class BackupService {
     if (passphrase.trim().length < 10) {
       throw ArgumentError('Use a backup passphrase with at least 10 characters.');
     }
-    // 1. Fetch raw (already-encrypted) rows – no decryption needed.
-    final chatRows = (await DatabaseService.getRawChatMessageRows())
-        .map(Map<String, dynamic>.from)
-        .toList();
-    final journalRows = (await DatabaseService.getRawJournalEntryRows())
-        .map(Map<String, dynamic>.from)
-        .toList();
-    final moodRows = (await DatabaseService.getRawMoodRows())
-        .map(Map<String, dynamic>.from)
-        .toList();
+    // Decrypt each record into a portable payload. The complete payload is
+    // encrypted below with the passphrase; import re-encrypts records with the
+    // destination installation key before writing them to SQLite.
+    final rawChatRows = await DatabaseService.getRawChatMessageRows();
+    final rawJournalRows = await DatabaseService.getRawJournalEntryRows();
+    final rawMoodRows = await DatabaseService.getRawMoodRows();
 
-    // Encrypt legacy plaintext mood metadata before it enters an export.
-    for (final row in chatRows) {
-      final mood = row['mood'];
-      if (mood is String && mood.isNotEmpty && row['mood_iv'] == null) {
-        final encrypted = await EncryptionService.encrypt(mood);
-        row['mood'] = encrypted['ciphertext'];
-        row['mood_iv'] = encrypted['iv'];
-      }
+    final chatRows = <Map<String, dynamic>>[];
+    for (final source in rawChatRows) {
+      final row = Map<String, dynamic>.from(source);
+      chatRows.add({
+        'id': row['id'],
+        'session_id': row['session_id'],
+        'role': row['role'],
+        'text': await _decryptPortableField(row['ciphertext'], row['iv']),
+        'timestamp': row['timestamp'],
+        'mood': row['mood'] == null
+            ? null
+            : await _decryptPortableField(row['mood'], row['mood_iv']),
+        'intensity': row['intensity'],
+      });
     }
-    for (final row in journalRows) {
-      final mood = row['mood'];
-      if (mood is String && mood.isNotEmpty && row['mood_iv'] == null) {
-        final encrypted = await DatabaseService.encryptBackupField(mood);
-        row['mood'] = encrypted['ciphertext'];
-        row['mood_iv'] = encrypted['iv'];
-      }
+
+    final journalRows = <Map<String, dynamic>>[];
+    for (final source in rawJournalRows) {
+      final row = Map<String, dynamic>.from(source);
+      journalRows.add({
+        'id': row['id'],
+        'text': await _decryptPortableField(row['ciphertext'], row['iv']),
+        'mood': await _decryptPortableField(row['mood'], row['mood_iv']),
+        'created_at': row['created_at'],
+        'modified_at': row['modified_at'],
+      });
     }
-    for (final row in moodRows) {
-      final mood = row['mood'];
-      if (mood is String && mood.isNotEmpty && row['mood_iv'] == null) {
-        final encrypted = await DatabaseService.encryptBackupField(mood);
-        row['mood'] = encrypted['ciphertext'];
-        row['mood_iv'] = encrypted['iv'];
-      }
+
+    final moodRows = <Map<String, dynamic>>[];
+    for (final source in rawMoodRows) {
+      final row = Map<String, dynamic>.from(source);
+      moodRows.add({
+        'id': row['id'],
+        'mood': await _decryptPortableField(row['mood'], row['mood_iv']),
+        'timestamp': row['timestamp'],
+        'note': row['note_ciphertext'] == null
+            ? null
+            : await _decryptPortableField(row['note_ciphertext'], row['iv']),
+      });
     }
 
     // The complete archive, including metadata, is encrypted with a key
@@ -201,9 +212,15 @@ class BackupService {
     // Validate the entire archive structure before writing any rows. Without
     // this preflight, a malformed later table could leave an accidental partial
     // restore even when the file is rejected.
-    final chatRows = _validatedRows(data, 'chat_messages');
-    final journalRows = _validatedRows(data, 'journal_entries');
-    final moodRows = _validatedRows(data, 'mood_logs');
+    final chatRows = isPortable
+        ? await _encryptPortableChatRows(_validatedRows(data, 'chat_messages'))
+        : _validatedRows(data, 'chat_messages');
+    final journalRows = isPortable
+        ? await _encryptPortableJournalRows(_validatedRows(data, 'journal_entries'))
+        : _validatedRows(data, 'journal_entries');
+    final moodRows = isPortable
+        ? await _encryptPortableMoodRows(_validatedRows(data, 'mood_logs'))
+        : _validatedRows(data, 'mood_logs');
 
     // Restore every table in a single SQLite transaction. A malformed row or
     // schema mismatch rolls back the complete import instead of silently
@@ -225,6 +242,99 @@ class BackupService {
       journals: journalRows.length,
       moods: moodRows.length,
     );
+  }
+
+  static Future<String> _decryptPortableField(
+    dynamic ciphertext,
+    dynamic iv,
+  ) async {
+    if (ciphertext is! String || ciphertext.isEmpty) return '';
+    // Older metadata fields were plaintext before encryption was introduced.
+    if (iv is! String || iv.isEmpty) return ciphertext;
+    return EncryptionService.decrypt(ciphertext: ciphertext, ivBase64: iv);
+  }
+
+  static Future<List<Map<String, dynamic>>> _encryptPortableChatRows(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    final result = <Map<String, dynamic>>[];
+    for (final row in rows) {
+      if (row['id'] is! String || row['session_id'] is! String ||
+          row['role'] is! String || row['text'] is! String ||
+          row['timestamp'] is! num) {
+        throw const FormatException('Portable backup contains an invalid chat record.');
+      }
+      final text = await EncryptionService.encrypt(row['text'] as String);
+      final moodValue = row['mood'];
+      final mood = moodValue is String
+          ? await EncryptionService.encrypt(moodValue)
+          : null;
+      result.add({
+        'id': row['id'],
+        'session_id': row['session_id'],
+        'role': row['role'],
+        'ciphertext': text['ciphertext'],
+        'iv': text['iv'],
+        'timestamp': (row['timestamp'] as num).toInt(),
+        'mood': mood?['ciphertext'],
+        'mood_iv': mood?['iv'],
+        'intensity': row['intensity'] is num
+            ? (row['intensity'] as num).toDouble()
+            : null,
+      });
+    }
+    return result;
+  }
+
+  static Future<List<Map<String, dynamic>>> _encryptPortableJournalRows(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    final result = <Map<String, dynamic>>[];
+    for (final row in rows) {
+      if (row['id'] is! String || row['text'] is! String ||
+          row['mood'] is! String || row['created_at'] is! num ||
+          row['modified_at'] is! num) {
+        throw const FormatException('Portable backup contains an invalid journal record.');
+      }
+      final text = await EncryptionService.encrypt(row['text'] as String);
+      final mood = await EncryptionService.encrypt(row['mood'] as String);
+      result.add({
+        'id': row['id'],
+        'ciphertext': text['ciphertext'],
+        'iv': text['iv'],
+        'mood': mood['ciphertext'],
+        'mood_iv': mood['iv'],
+        'created_at': (row['created_at'] as num).toInt(),
+        'modified_at': (row['modified_at'] as num).toInt(),
+      });
+    }
+    return result;
+  }
+
+  static Future<List<Map<String, dynamic>>> _encryptPortableMoodRows(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    final result = <Map<String, dynamic>>[];
+    for (final row in rows) {
+      if (row['id'] is! String || row['mood'] is! String ||
+          row['timestamp'] is! num) {
+        throw const FormatException('Portable backup contains an invalid mood record.');
+      }
+      final mood = await EncryptionService.encrypt(row['mood'] as String);
+      final noteValue = row['note'];
+      final note = noteValue is String && noteValue.isNotEmpty
+          ? await EncryptionService.encrypt(noteValue)
+          : null;
+      result.add({
+        'id': row['id'],
+        'mood': mood['ciphertext'],
+        'mood_iv': mood['iv'],
+        'timestamp': (row['timestamp'] as num).toInt(),
+        'note_ciphertext': note?['ciphertext'],
+        'iv': note?['iv'],
+      });
+    }
+    return result;
   }
 
   static List<int> _secureRandomBytes(int length) {
