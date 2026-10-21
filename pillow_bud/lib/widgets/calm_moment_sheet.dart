@@ -15,6 +15,18 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
   bool _isBreathing = false;
   bool _isGrounding = false;
   String _phase = 'Ready when you are';
+  String _selectedSmallStep = '';
+  final TextEditingController _situationController = TextEditingController();
+  final TextEditingController _thoughtController = TextEditingController();
+  final TextEditingController _balancedThoughtController = TextEditingController();
+
+  static const List<String> _smallSteps = [
+    'Drink a glass of water',
+    'Take a minute of fresh air',
+    'Send a message to someone safe',
+    'Make one task smaller',
+    'Rest for five minutes',
+  ];
 
   static const List<Map<String, String>> _groundingSteps = [
     {'count': '5', 'label': 'things you can see'},
@@ -68,6 +80,9 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
     _breathController
       ..removeStatusListener(_onBreathStatusChanged)
       ..dispose();
+    _situationController.dispose();
+    _thoughtController.dispose();
+    _balancedThoughtController.dispose();
     super.dispose();
   }
 
@@ -308,8 +323,178 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            _buildSupportTool(
+              context: context,
+              primary: primary,
+              title: 'Untangle a difficult thought',
+              subtitle: 'Make room between what happened and what your mind is saying.',
+              icon: Icons.psychology_alt_rounded,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _reflectionField(
+                    controller: _situationController,
+                    label: 'What happened?',
+                    hint: 'Describe only the part that matters right now.',
+                  ),
+                  const SizedBox(height: 10),
+                  _reflectionField(
+                    controller: _thoughtController,
+                    label: 'What are you telling yourself about it?',
+                    hint: 'Notice the thought without judging yourself.',
+                  ),
+                  const SizedBox(height: 10),
+                  _reflectionField(
+                    controller: _balancedThoughtController,
+                    label: 'What is a kinder, more balanced possibility?',
+                    hint: 'What would you say to a friend in the same situation?',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'You do not have to force a positive thought. A little more room for uncertainty is enough.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildSupportTool(
+              context: context,
+              primary: primary,
+              title: 'A kinder voice',
+              subtitle: 'Try offering yourself the compassion you would give someone you care about.',
+              icon: Icons.favorite_border_rounded,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _kindnessLine(context, 'This is hard for me right now.'),
+                  _kindnessLine(context, 'I do not have to solve everything at once.'),
+                  _kindnessLine(context, 'I can take one small step, or pause.'),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Choose only the words that feel believable. You can change them to sound like you.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildSupportTool(
+              context: context,
+              primary: primary,
+              title: 'Find one manageable next step',
+              subtitle: 'You only need to choose what might help for the next few minutes.',
+              icon: Icons.spa_outlined,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ..._smallSteps.map(
+                    (step) => RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      value: step,
+                      groupValue: _selectedSmallStep,
+                      activeColor: primary,
+                      title: Text(step, style: Theme.of(context).textTheme.bodyMedium),
+                      onChanged: (value) => setState(() {
+                        _selectedSmallStep = value ?? '';
+                      }),
+                    ),
+                  ),
+                  if (_selectedSmallStep.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        'For now: $_selectedSmallStep. That is enough to begin; you can change your mind at any time.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSupportTool({
+    required BuildContext context,
+    required Color primary,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Widget child,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.35)),
+      ),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          leading: Icon(icon, color: primary),
+          title: Text(title, style: theme.textTheme.titleMedium),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(subtitle, style: theme.textTheme.bodySmall),
+          ),
+          children: [child],
+        ),
+      ),
+    );
+  }
+
+  Widget _reflectionField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+  }) {
+    final theme = Theme.of(context);
+    return TextField(
+      controller: controller,
+      minLines: 2,
+      maxLines: 4,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        alignLabelWithHint: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      style: theme.textTheme.bodyMedium,
+    );
+  }
+
+  Widget _kindnessLine(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle_outline_rounded, size: 19, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message, style: theme.textTheme.bodyMedium)),
+        ],
       ),
     );
   }
