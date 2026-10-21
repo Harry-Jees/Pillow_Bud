@@ -130,6 +130,7 @@ class BackupService {
     }
 
     int chats = 0, journals = 0, moods = 0;
+    int skippedChats = 0, skippedJournals = 0, skippedMoods = 0;
 
     for (final row in (data['chat_messages'] as List<dynamic>? ?? [])) {
       try {
@@ -139,6 +140,7 @@ class BackupService {
         );
         chats++;
       } catch (e) {
+        skippedChats++;
         debugPrint('BackupService: skipped chat row: $e');
       }
     }
@@ -151,6 +153,7 @@ class BackupService {
         );
         journals++;
       } catch (e) {
+        skippedJournals++;
         debugPrint('BackupService: skipped journal row: $e');
       }
     }
@@ -163,6 +166,7 @@ class BackupService {
         );
         moods++;
       } catch (e) {
+        skippedMoods++;
         debugPrint('BackupService: skipped mood row: $e');
       }
     }
@@ -170,7 +174,14 @@ class BackupService {
     debugPrint(
       'BackupService: imported $chats chats, $journals journals, $moods moods.',
     );
-    return ImportResult(chats: chats, journals: journals, moods: moods);
+    return ImportResult(
+      chats: chats,
+      journals: journals,
+      moods: moods,
+      skippedChats: skippedChats,
+      skippedJournals: skippedJournals,
+      skippedMoods: skippedMoods,
+    );
   }
 }
 
@@ -179,16 +190,24 @@ class ImportResult {
   final int chats;
   final int journals;
   final int moods;
+  final int skippedChats;
+  final int skippedJournals;
+  final int skippedMoods;
 
   const ImportResult({
     required this.chats,
     required this.journals,
     required this.moods,
+    this.skippedChats = 0,
+    this.skippedJournals = 0,
+    this.skippedMoods = 0,
   });
 
   int get total => chats + journals + moods;
+  int get skippedTotal => skippedChats + skippedJournals + skippedMoods;
 
   @override
   String toString() =>
-      'ImportResult(chats: $chats, journals: $journals, moods: $moods)';
+      'ImportResult(chats: $chats, journals: $journals, moods: $moods, '
+      'skipped: $skippedTotal)';
 }
