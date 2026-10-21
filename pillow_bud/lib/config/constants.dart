@@ -1,7 +1,7 @@
 class Constants {
   // Crisis resources (India-focused). Keep these aligned with
   // CrisisDetector.getResources() and periodically re-verify official sources.
-  static const String icallNumber = '9152987821';
+  static const String icallNumber = '02225521111';
   static const String icallName = 'iCall India';
 
   static const String vandrevalaNumber = '9999666555';

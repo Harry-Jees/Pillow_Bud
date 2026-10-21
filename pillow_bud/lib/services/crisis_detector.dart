@@ -75,8 +75,9 @@ Please know that your life matters, you are not alone, and there is real support
 Please reach out to one of these free, confidential helplines:
 
 🆘 Tele-MANAS (Govt. of India): 14416 or 1800-891-4416 (24/7, free)
+🆘 iCALL (TISS): 022-25521111 (Monday–Saturday, 8 AM–9 PM)
 🆘 Vandrevala Foundation: +91 9999 666 555 (24/7)
-🆘 AASRA: 9820466728
+🆘 AASRA: 9820466726 (24/7)
 🆘 Immediate danger in India: 112
 
 You deserve compassionate, professional support. Please reach out to them now. 💙''';
@@ -85,6 +86,11 @@ You deserve compassionate, professional support. Please reach out to them now. �
   /// Returns a structured list for UI buttons and cards
   static List<Map<String, String>> getResources() {
     return [
+      {
+        'name': 'iCALL (TISS Counselling Helpline)',
+        'number': Constants.icallNumber,
+        'desc': 'Monday–Saturday, 8 AM–9 PM; counselling support',
+      },
       {
         'name': 'Tele-MANAS (National Mental Health Helpline)',
         'number': '14416',
@@ -97,7 +103,7 @@ You deserve compassionate, professional support. Please reach out to them now. �
       },
       {
         'name': 'AASRA Helpline',
-        'number': '9820466728',
+        'number': '9820466726',
         'desc': '24/7 Suicide Prevention & Crisis Intervention',
       },
       {

@@ -34,6 +34,8 @@ void main() {
       expect(find.text('Bud'), findsOneWidget);
       expect(find.text('Share your thoughts with Bud...'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
     });
 
     testWidgets('JournalScreen renders empty state when no entries', (tester) async {

@@ -207,14 +207,17 @@ jobs:
           Name=Pillow Bud
           Comment=Your emotional companion
           Exec=pillow-bud
+          Icon=pillow-bud
           Categories=Utility;
           Terminal=false
           DESKTOP
           cp "$ROOT/pillow-bud.desktop" "$ROOT/usr/share/applications/"
-          if [ -f assets/images/app_icon.png ]; then
-            cp assets/images/app_icon.png "$ROOT/usr/share/icons/hicolor/256x256/apps/pillow-bud.png"
-            cp assets/images/app_icon.png "$ROOT/pillow-bud.png"
-          fi
+          ICON="assets/images/app_icon.png"
+          test -s "$ICON" || { echo "Missing or empty app icon: $ICON"; exit 1; }
+          cp "$ICON" "$ROOT/usr/share/icons/hicolor/256x256/apps/pillow-bud.png"
+          cp "$ICON" "$ROOT/pillow-bud.png"
+          desktop-file-validate "$ROOT/pillow-bud.desktop"
+          test -s "$ROOT/pillow-bud.png"
           curl --fail --location --retry 3 "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -o build/appimagetool
           chmod +x build/appimagetool
           APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 ./build/appimagetool "$ROOT" "build/pillow-bud-linux-x86_64.AppImage"

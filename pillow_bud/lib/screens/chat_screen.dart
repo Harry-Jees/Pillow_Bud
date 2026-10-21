@@ -36,7 +36,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         setState(() => _hasInput = hasText);
       }
     });
-    _historyLoadFuture = _loadChatHistory();
+    // Provider state must not be mutated synchronously from initState.
+    // Defer initialization until after the first frame so Riverpod listeners
+    // and the widget tree are fully established.
+    _historyLoadFuture = Future<void>.value();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // A previous ChatScreen may have been removed during an in-flight send.
+      // Reset transient UI state on the newly mounted screen.
+      ref.read(isLoadingChatProvider.notifier).state = false;
+      _historyLoadFuture = _loadChatHistory();
+    });
   }
 
   Future<void> _loadChatHistory() async {
@@ -89,7 +99,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
-    ref.read(isLoadingChatProvider.notifier).state = false;
+    // Do not write to shared providers while this ConsumerState is disposing.
+    // The next mounted ChatScreen resets transient loading state after its
+    // first frame; active async work also checks mounted before updating UI.
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
