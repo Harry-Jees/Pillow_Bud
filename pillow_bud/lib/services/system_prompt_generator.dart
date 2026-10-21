@@ -6,6 +6,7 @@ class SystemPromptGenerator {
     required String personalityMode,
     required String detectedEmotion,
     required double emotionIntensity,
+    String? recentContext,
   }) {
     final basePrompt = _getBasePrompt(userName);
     final personalityGuidance = _getPersonalityGuidance(personalityMode);
@@ -14,6 +15,9 @@ class SystemPromptGenerator {
       emotionIntensity,
     );
     final safetyGuidance = _getSafetyGuidance();
+    final context = recentContext?.trim();
+    final recentContextSection =
+        context == null || context.isEmpty ? 'None' : context;
 
     return '''
 $basePrompt
@@ -30,6 +34,9 @@ BRAND SIGNATURE:
 
 EMOTIONAL READ:
 $emotionalResponse
+
+RECENT CONTEXT:
+$recentContextSection
 
 $safetyGuidance
 

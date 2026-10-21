@@ -41,7 +41,7 @@ void main() {
         emotionIntensity: 0.2,
         recentContext: 'User: I had a hard day.',
       );
-      expect(withContext, contains('User: I had a hard day.'));
+      expect(withContext, contains('RECENT CONTEXT:\nUser: I had a hard day.'));
 
       final withoutContext = SystemPromptGenerator.generatePrompt(
         userName: 'Sam',
