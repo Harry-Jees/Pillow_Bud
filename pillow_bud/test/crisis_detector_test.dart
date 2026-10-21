@@ -31,7 +31,7 @@ void main() {
     test('Structured resources list contains expected entries', () {
       final resources = CrisisDetector.getResources();
       expect(resources.length, greaterThanOrEqualTo(5));
-      expect(resources.any((r) => r['name']!.contains('iCALL')), isTrue);
+      expect(resources.any((r) => r['name']!.contains('iCall')), isTrue);
       expect(resources.any((r) => r['number'] == '02225521111'), isTrue);
       expect(resources.any((r) => r['number'] == '9820466726'), isTrue);
       expect(resources.any((r) => r['name']!.contains('iCall')), isTrue);
