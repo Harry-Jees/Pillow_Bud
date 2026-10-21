@@ -1,0 +1,248 @@
+name: Build Pillow Bud Releases
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-releases.yml"
+      - "pillow_bud/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pillow-bud-release-build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_WORKING_DIRECTORY: pillow_bud
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pillow_bud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pillow-bud-android-apk
+          path: pillow_bud/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows x64 portable + installer
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: pillow_bud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - name: Package portable ZIP
+        shell: pwsh
+        run: |
+          $bundle = "build\windows\x64\runner\Release"
+          if (!(Test-Path "$bundle\pillow_bud.exe")) {
+            throw "Expected Flutter Windows executable was not found at $bundle"
+          }
+          Compress-Archive -Path "$bundle\*" -DestinationPath "build\pillow-bud-windows-x64-portable.zip" -Force
+      - name: Create Windows installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iss = @'
+          [Setup]
+          AppId={{D2F6C7B1-0C0D-4AC1-9E7E-BA77F1A4A0D2}
+          AppName=Pillow Bud
+          AppVersion=1.0.0
+          DefaultDirName={autopf}\Pillow Bud
+          DefaultGroupName=Pillow Bud
+          OutputDir=build
+          OutputBaseFilename=pillow-bud-windows-x64-setup
+          Compression=lzma
+          SolidCompression=yes
+          ArchitecturesInstallIn64BitMode=x64
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
+          [Icons]
+          Name: "{group}\Pillow Bud"; Filename: "{app}\pillow_bud.exe"
+          Name: "{autodesktop}\Pillow Bud"; Filename: "{app}\pillow_bud.exe"
+          [Run]
+          Filename: "{app}\pillow_bud.exe"; Description: "Launch Pillow Bud"; Flags: postinstall nowait skipifsilent
+          '@
+          Set-Content -Path "pillow-bud-installer.iss" -Value $iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "pillow-bud-installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pillow-bud-windows-x64
+          path: |
+            pillow_bud/build/pillow-bud-windows-x64-portable.zip
+            pillow_bud/build/pillow-bud-windows-x64-setup.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: macOS ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            architecture: intel-x64
+          - runner: macos-15
+            architecture: apple-silicon-arm64
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: pillow_bud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - name: Package DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/macos/Build/Products/Release/pillow_bud.app"
+          test -d "$APP" || { echo "Missing macOS app bundle: $APP"; exit 1; }
+          mkdir -p dist
+          cp -R "$APP" dist/
+          hdiutil create -volname "Pillow Bud" -srcfolder dist -ov -format UDZO "build/pillow-bud-macos-${{ matrix.architecture }}.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pillow-bud-macos-${{ matrix.architecture }}
+          path: pillow_bud/build/pillow-bud-macos-${{ matrix.architecture }}.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: Linux Debian package + AppImage
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: pillow_bud
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev dpkg-dev patchelf desktop-file-utils
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build linux --release
+      - name: Build Debian package
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/linux/x64/release/bundle"
+          test -x "$APP/pillow_bud" || { echo "Missing Linux executable"; exit 1; }
+          PKG="$PWD/build/deb-root"
+          mkdir -p "$PKG/DEBIAN" "$PKG/opt/pillow-bud" "$PKG/usr/bin"
+          cp -a "$APP/." "$PKG/opt/pillow-bud/"
+          cat > "$PKG/DEBIAN/control" <<'CONTROL'
+          Package: pillow-bud
+          Version: 1.0.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Harry Jees
+          Description: Pillow Bud emotional companion
+          CONTROL
+          printf '#!/bin/sh\nexec /opt/pillow-bud/pillow_bud "$@"\n' > "$PKG/usr/bin/pillow-bud"
+          chmod 0755 "$PKG/usr/bin/pillow-bud"
+          dpkg-deb --build "$PKG" "build/pillow-bud-linux-amd64.deb"
+      - name: Build AppImage
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/linux/x64/release/bundle"
+          ROOT="$PWD/build/AppDir"
+          mkdir -p "$ROOT/usr/bin" "$ROOT/usr/lib" "$ROOT/usr/share/applications" "$ROOT/usr/share/icons/hicolor/256x256/apps"
+          cp -a "$APP/." "$ROOT/usr/bin/"
+          # AppImage entrypoint keeps the Flutter bundle's relative library paths intact.
+          cat > "$ROOT/AppRun" <<'APPRUN'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export LD_LIBRARY_PATH="$HERE/usr/bin:$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
+          exec "$HERE/usr/bin/pillow_bud" "$@"
+          APPRUN
+          chmod +x "$ROOT/AppRun"
+          cat > "$ROOT/pillow-bud.desktop" <<'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=Pillow Bud
+          Comment=Your emotional companion
+          Exec=pillow-bud
+          Categories=Utility;
+          Terminal=false
+          DESKTOP
+          cp "$ROOT/pillow-bud.desktop" "$ROOT/usr/share/applications/"
+          if [ -f assets/images/app_icon.png ]; then
+            cp assets/images/app_icon.png "$ROOT/usr/share/icons/hicolor/256x256/apps/pillow-bud.png"
+            cp assets/images/app_icon.png "$ROOT/pillow-bud.png"
+          fi
+          curl --fail --location --retry 3 "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -o build/appimagetool
+          chmod +x build/appimagetool
+          ARCH=x86_64 ./build/appimagetool "$ROOT" "build/pillow-bud-linux-x86_64.AppImage"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pillow-bud-linux-amd64
+          path: |
+            pillow_bud/build/pillow-bud-linux-amd64.deb
+            pillow_bud/build/pillow-bud-linux-x86_64.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+  release-summary:
+    name: Build summary
+    if: always()
+    needs: [android, windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report build status
+        env:
+          ANDROID: ${{ needs.android.result }}
+          WINDOWS: ${{ needs.windows.result }}
+          MACOS: ${{ needs.macos.result }}
+          LINUX: ${{ needs.linux.result }}
+        run: |
+          {
+            echo "## Pillow Bud release build"
+            echo "| Target | Result |"
+            echo "|---|---|"
+            echo "| Android APK | $ANDROID |"
+            echo "| Windows x64 portable ZIP + installer EXE | $WINDOWS |"
+            echo "| macOS Intel DMG + Apple Silicon DMG | $MACOS |"
+            echo "| Linux Debian package + AppImage | $LINUX |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          test "$ANDROID" = success -a "$WINDOWS" = success -a "$MACOS" = success -a "$LINUX" = success
