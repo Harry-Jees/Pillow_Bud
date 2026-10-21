@@ -32,30 +32,30 @@ class DateUtils {
 
   static int calculateStreak(List<DateTime> dates) {
     if (dates.isEmpty) return 0;
-    if (dates.length == 1) return 1;
 
-    // Validate that dates are not null and in proper format
     try {
-      dates.sort((a, b) => b.compareTo(a));
+      // Normalize to calendar days and deduplicate multiple check-ins on one day.
+      final uniqueDays = dates
+          .map((date) => DateTime(date.year, date.month, date.day))
+          .toSet()
+          .toList()
+        ..sort((a, b) => b.compareTo(a));
 
-      int streak = 0;
-      DateTime? lastDate;
+      final today = DateTime.now();
+      final todayOnly = DateTime(today.year, today.month, today.day);
+      final mostRecent = uniqueDays.first;
 
-      for (final date in dates) {
-        if (lastDate == null) {
-          streak = 1;
-          lastDate = date;
-        } else {
-          final daysDifference = lastDate.difference(date).inDays;
-          if (daysDifference == 1) {
-            streak++;
-            lastDate = date;
-          } else {
-            break;
-          }
-        }
+      // An old streak is not presented as current after the user has been away.
+      final daysSinceLastCheckIn = todayOnly.difference(mostRecent).inDays;
+      if (daysSinceLastCheckIn < 0 || daysSinceLastCheckIn > 1) return 0;
+
+      var streak = 1;
+      var previous = mostRecent;
+      for (final day in uniqueDays.skip(1)) {
+        if (previous.difference(day).inDays != 1) break;
+        streak++;
+        previous = day;
       }
-
       return streak;
     } catch (e) {
       debugPrint('Error calculating streak: $e');
