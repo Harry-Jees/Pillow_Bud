@@ -71,7 +71,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         pageBuilder: (_, __, ___) => const HomeScreen(),
         transitionsBuilder: (_, animation, __, child) =>
             FadeTransition(opacity: animation, child: child),
-        transitionDuration: const Duration(milliseconds: 350),
+        transitionDuration: MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : const Duration(milliseconds: 350),
       ),
     );
   }
@@ -79,7 +81,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void _nextPage() {
     if (_currentPage < 5) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
+        duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
       );
     } else {
