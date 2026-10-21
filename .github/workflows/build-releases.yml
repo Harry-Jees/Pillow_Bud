@@ -212,7 +212,7 @@ jobs:
           fi
           curl --fail --location --retry 3 "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -o build/appimagetool
           chmod +x build/appimagetool
-          ARCH=x86_64 ./build/appimagetool "$ROOT" "build/pillow-bud-linux-x86_64.AppImage"
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 ./build/appimagetool "$ROOT" "build/pillow-bud-linux-x86_64.AppImage"
       - uses: actions/upload-artifact@v4
         with:
           name: pillow-bud-linux-amd64
