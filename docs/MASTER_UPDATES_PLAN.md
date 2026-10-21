@@ -361,3 +361,11 @@ Implementation has started on `MASTER-UPDATES`. This section records completed c
 - [ ] Test native builds and download edge cases on supported platforms.
 
 No workflow reruns were triggered for this implementation pass. Code has been committed to this branch only; `main` remains unchanged until validation and review.
+
+
+### Build progress — Phase 2 follow-up
+
+- [x] Preflight-validates all backup table fields and record shapes before inserting any rows, so malformed archive structure is rejected before a restore begins.
+- [x] Added regression tests for malformed table payloads and malformed record entries.
+- [ ] Run the new tests and existing suite in a Flutter-enabled environment; remote edits alone do not prove compilation or test success.
+- [ ] Transactional restore and full rollback semantics remain future work; per-row database conflicts can still produce a reported partial restore.
