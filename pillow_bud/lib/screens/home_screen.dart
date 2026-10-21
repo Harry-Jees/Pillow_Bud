@@ -387,8 +387,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(height: 24),
 
-          // 2. Material 3 Mood Picker Card
-          Container(
+          // 2. Liquid-glass mood picker
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: isDarkMode
@@ -488,11 +492,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ],
             ),
+              ),
+            ),
           ),
           const SizedBox(height: 20),
 
-          // 3. Bud Preview Card
-          Container(
+          // 3. Liquid-glass Bud preview
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -554,6 +564,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
               ],
+            ),
+              ),
             ),
           ),
           const SizedBox(height: 24),
