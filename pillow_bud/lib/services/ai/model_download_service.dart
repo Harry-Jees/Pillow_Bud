@@ -139,144 +139,10 @@ class ModelDownloadService {
       int? expectedResponseBytes;
 
       if (isPartial) {
-        // Validate the complete RFC-style range, not just its prefix. A
-        // malformed or mismatched range must never be appended to a model.
+        // Validate the complete range before appending any bytes.
         final match = contentRange == null
             ? null
-            : RegExp(r'^bytes (\\d+)-(\\d+)/(\\d+)
-
-      sink = tempFile.openWrite(
-        mode: isPartial ? FileMode.append : FileMode.write,
-      );
-
-      var receivedNow = 0;
-      final stream = response.data?.stream;
-      if (stream == null) {
-        throw StateError('The model server returned an empty response.');
-      }
-
-      await for (final chunk in stream) {
-        sink.add(chunk);
-        receivedNow += chunk.length;
-        final currentTotalReceived = existingLength + receivedNow;
-
-        if (totalBytes > 0) {
-          final progress =
-              (currentTotalReceived / totalBytes).clamp(0.0, 1.0).toDouble();
-          progressNotifier.value = progress;
-          final currentMB =
-              (currentTotalReceived / (1024 * 1024)).toStringAsFixed(1);
-          final totalMB = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
-          statusMessageNotifier.value =
-              'Downloading model: $currentMB MB / $totalMB MB '
-              '(${(progress * 100).toStringAsFixed(0)}%)';
-        } else {
-          final currentMB =
-              (currentTotalReceived / (1024 * 1024)).toStringAsFixed(1);
-          statusMessageNotifier.value = 'Downloading: $currentMB MB';
-        }
-      }
-
-      await sink.flush();
-      await sink.close();
-      sink = null;
-
-      if (expectedResponseBytes != null && receivedNow != expectedResponseBytes) {
-        throw StateError(
-          'The model server sent $receivedNow bytes; '
-          'expected $expectedResponseBytes bytes for this response.',
-        );
-      }
-
-      final downloadedBytes = await tempFile.length();
-      if (downloadedBytes < minimumValidModelBytes ||
-          (totalBytes > 0 && downloadedBytes != totalBytes)) {
-        final expectedSize = totalBytes > 0
-            ? '$totalBytes bytes'
-            : 'at least $minimumValidModelBytes bytes';
-        throw StateError(
-          'Downloaded model is incomplete or has an unexpected size '
-          '($downloadedBytes bytes; expected $expectedSize). '
-          'The partial file was kept so the download can be resumed.',
-        );
-      }
-
-      final destination = File(savePath);
-      if (await destination.exists()) {
-        await destination.delete();
-      }
-      await tempFile.rename(savePath);
-
-      statusNotifier.value = ModelDownloadStatus.downloaded;
-      progressNotifier.value = 1.0;
-      statusMessageNotifier.value = 'Model ready (Local GGUF)';
-      onComplete?.call();
-    } catch (error) {
-      await sink?.close();
-      if (error is DioException && CancelToken.isCancel(error)) {
-        statusNotifier.value = ModelDownloadStatus.paused;
-        final currentLength =
-            await tempFile.exists() ? await tempFile.length() : 0;
-        final currentMB =
-            (currentLength / (1024 * 1024)).toStringAsFixed(1);
-        statusMessageNotifier.value =
-            'Download paused ($currentMB MB saved). Tap Resume to continue.';
-      } else {
-        debugPrint('Download error: $error');
-        statusNotifier.value = ModelDownloadStatus.failed;
-        statusMessageNotifier.value = 'Download error – tap to retry.';
-        onError?.call(error.toString());
-      }
-    }
-  }
-
-  static void pauseDownload() {
-    _cancelToken?.cancel('Paused by user');
-    statusNotifier.value = ModelDownloadStatus.paused;
-  }
-
-  static Future<void> resumeDownload({
-    VoidCallback? onComplete,
-    Function(String error)? onError,
-  }) async {
-    await startDownload(onComplete: onComplete, onError: onError);
-  }
-
-  static Future<void> cancelDownload() async {
-    _cancelToken?.cancel('Cancelled by user');
-    try {
-      final tempFile = File(await getTempPath());
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
-    } catch (_) {}
-
-    statusNotifier.value = ModelDownloadStatus.notDownloaded;
-    progressNotifier.value = 0.0;
-    statusMessageNotifier.value = 'Download cancelled';
-  }
-
-  static Future<void> deleteModel() async {
-    try {
-      final modelFile = File(await getModelPath());
-      if (await modelFile.exists()) {
-        await modelFile.delete();
-      }
-
-      final tempFile = File(await getTempPath());
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
-
-      statusNotifier.value = ModelDownloadStatus.notDownloaded;
-      progressNotifier.value = 0.0;
-      statusMessageNotifier.value = 'Model removed. Tap to download.';
-    } catch (error) {
-      debugPrint('Error deleting model: $error');
-    }
-  }
-}
-).firstMatch(contentRange);
+            : RegExp(r'^bytes (\d+)-(\d+)/(\d+)$').firstMatch(contentRange);
         final start = int.tryParse(match?.group(1) ?? '');
         final end = int.tryParse(match?.group(2) ?? '');
         final total = int.tryParse(match?.group(3) ?? '');
@@ -284,7 +150,8 @@ class ModelDownloadService {
             start != existingLength ||
             end == null ||
             total == null ||
-            end < start! ||
+            start == null ||
+            end < start ||
             total <= end) {
           throw StateError(
             'The server returned an invalid byte range; download cannot be resumed safely.',
@@ -297,7 +164,8 @@ class ModelDownloadService {
         existingLength = 0;
         final lengthHeader = response.headers.value('content-length');
         expectedTotalBytes = int.tryParse(lengthHeader ?? '') ?? 0;
-        expectedResponseBytes = expectedTotalBytes > 0 ? expectedTotalBytes : null;
+        expectedResponseBytes =
+            expectedTotalBytes > 0 ? expectedTotalBytes : null;
       }
 
       final contentLengthHeader = response.headers.value('content-length');
@@ -346,6 +214,13 @@ class ModelDownloadService {
       await sink.flush();
       await sink.close();
       sink = null;
+
+      if (expectedResponseBytes != null && receivedNow != expectedResponseBytes) {
+        throw StateError(
+          'The model server sent $receivedNow bytes; '
+          'expected $expectedResponseBytes bytes for this response.',
+        );
+      }
 
       final downloadedBytes = await tempFile.length();
       if (downloadedBytes < minimumValidModelBytes ||
