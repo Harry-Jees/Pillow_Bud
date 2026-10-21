@@ -16,7 +16,6 @@ class Constants {
     'end my life',
     'suicide',
     'overdose',
-    'jump',
     'want to die',
     'better off dead',
     'harm myself',
