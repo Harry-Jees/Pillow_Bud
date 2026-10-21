@@ -342,9 +342,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              importResult.skippedTotal == 0
-                  ? 'Restored ${importResult.chats} chats, ${importResult.journals} journals, ${importResult.moods} mood logs.'
-                  : 'Partially restored: ${importResult.chats} chats, ${importResult.journals} journals, ${importResult.moods} mood logs. ${importResult.skippedTotal} records were skipped.',
+              'Restored ${importResult.chats} chats, ${importResult.journals} journals, ${importResult.moods} mood logs.',
             ),
           ),
         );
