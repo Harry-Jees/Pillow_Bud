@@ -406,3 +406,10 @@ No workflow reruns were triggered for this implementation pass. Code has been co
 - The chat screen restores recent persisted turns into the LLM service on history load; this behavior was verified during the source audit and retained.
 
 - Follow-up audit: chat submission now waits for persisted-history loading before forming a prompt, locks repeated submissions synchronously, logs persistence failures, and saves the fallback response when generation fails. The service call bypasses cached `FutureProvider.family` results so identical user text is generated anew.
+
+## Latest implementation log — 2026-10-21
+
+- [x] Serialize model download starts through a shared in-flight future. Concurrent taps/screens now await the active transfer rather than opening competing writers against the same temporary download file and cancellation token.
+- [x] Preserve the existing HTTP range validation, response-byte count checks, minimum-size check, and GGUF magic check before promoting a completed download.
+- [ ] Add deterministic transfer tests using an injectable HTTP client or local test server; current tests cover path/state and GGUF signature checks but do not exercise concurrent/resumed transfers.
+- [ ] Verify pause → settle → resume and cancel → immediate restart behavior on a real Flutter runtime. Flutter/Dart SDKs are unavailable in the current editing environment, so analyzer, formatter, and tests remain unverified.
