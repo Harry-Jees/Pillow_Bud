@@ -49,7 +49,7 @@ class LocalLLMEngine {
     if (!await modelFile.exists() ||
         await modelFile.length() < ModelDownloadService.minimumValidModelBytes ||
         !await ModelDownloadService.hasGgufMagic(modelFile)) {
-      throw StateError(
+      throw Exception(
         'The local model is missing or invalid. '
         'Please download it again in Profile & Settings.',
       );
