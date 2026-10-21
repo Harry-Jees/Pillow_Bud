@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: pillow-bud-release-build-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   FLUTTER_WORKING_DIRECTORY: pillow_bud
