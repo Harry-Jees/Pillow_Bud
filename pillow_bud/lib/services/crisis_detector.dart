@@ -41,6 +41,7 @@ class CrisisDetector {
     final lower = message
         .toLowerCase()
         .replaceAll('’', "'")
+        .replaceAll(RegExp(r'[.,!?;:()"]'), ' ')
         .replaceAll(RegExp(r'\\s+'), ' ')
         .trim();
 
