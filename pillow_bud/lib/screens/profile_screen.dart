@@ -417,6 +417,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
       ref.read(journalEntriesProvider.notifier).state =
           await DatabaseService.getAllJournalEntries();
+      final restoredMessages = await DatabaseService.getAllChatMessages(
+        sessionId: ref.read(currentChatIdProvider),
+      );
+      ref.read(chatMessagesProvider.notifier).state = restoredMessages;
+      ref.read(llmServiceProvider).restoreConversationHistory(
+        restoredMessages.map((message) => {
+          'role': message.isFromBud ? 'assistant' : 'user',
+          'content': message.text,
+        }),
+      );
       ref.invalidate(moodHistoryProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
