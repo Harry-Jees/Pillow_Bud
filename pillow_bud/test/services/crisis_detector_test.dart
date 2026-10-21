@@ -18,6 +18,13 @@ void main() {
       expect(CrisisDetector.detect('I WANT TO DIE!'), isTrue);
     });
 
+    test('avoids common non-crisis expressions', () {
+      expect(CrisisDetector.detect('You kill me with laughter'), isFalse);
+      expect(CrisisDetector.detect("I'm hopeless at math"), isFalse);
+      expect(CrisisDetector.detect("I'm giving up on this homework"), isFalse);
+      expect(CrisisDetector.detect("There is no way out of this puzzle"), isFalse);
+    });
+
     test('recognizes indirect safety-risk language', () {
       expect(CrisisDetector.detect("I can't keep myself safe"), isTrue);
       expect(CrisisDetector.detect('I have a plan to end my life'), isTrue);
