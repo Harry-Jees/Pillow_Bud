@@ -52,23 +52,18 @@ class LocalLLMEngine {
   Future<String> generate(String prompt) async {
     final llama = _llama;
     if (llama == null) return '';
-    try {
-      final buffer = StringBuffer();
-      final stream = llama.answer(
-        prompt,
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.9,
-        penalizeNewline: false,
-      );
-      await for (final token in stream) {
-        buffer.write(token);
-      }
-      return buffer.toString().trim();
-    } catch (e) {
-      debugPrint('LocalLLMEngine.generate error: $e');
-      return '';
+    final buffer = StringBuffer();
+    final stream = llama.answer(
+      prompt,
+      temperature: 0.7,
+      topK: 40,
+      topP: 0.9,
+      penalizeNewline: false,
+    );
+    await for (final token in stream) {
+      buffer.write(token);
     }
+    return buffer.toString().trim();
   }
 
   /// Streams individual tokens for [prompt].

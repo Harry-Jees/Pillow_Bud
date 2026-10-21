@@ -16,6 +16,33 @@ class LLMService {
 
   final List<Map<String, String>> conversationHistory = [];
 
+  /// Restores recent persisted turns so Bud retains context after app restart.
+  void restoreConversationHistory(
+    Iterable<Map<String, String>> turns,
+  ) {
+    conversationHistory
+      ..clear()
+      ..addAll(
+        turns.where((turn) {
+          final role = turn['role'];
+          final content = turn['content'];
+          return (role == 'user' || role == 'assistant') &&
+              content != null &&
+              content.trim().isNotEmpty;
+        }).map((turn) => {
+          'role': turn['role']!,
+          'content': turn['content']!,
+        }),
+      );
+
+    if (conversationHistory.length > 24) {
+      conversationHistory.removeRange(0, conversationHistory.length - 24);
+    }
+  }
+
+  /// Clears in-memory context when the user starts a fresh conversation.
+  void clearConversationHistory() => conversationHistory.clear();
+
   /// Processes [userMessage] through the on-device model and returns
   /// Bud's response string.
   Future<String> getEmotionalBudResponse({
@@ -72,7 +99,10 @@ class LLMService {
     response = _cleanModelOutput(response);
 
     if (response.isEmpty) {
-      return 'I\'m here with you. Take a slow, steady breath. What feels heaviest right now?';
+      return 'I couldn\'t generate a response from the on-device model this time. '
+          'Your message is still here—please try again. If this keeps happening, '
+          'check that the downloaded model is complete and that your device has '
+          'enough available memory.';
     }
 
     // 7. Store conversation turn for continuous contextual memory
@@ -140,8 +170,11 @@ class LLMService {
           conversationHistory.removeRange(0, 2);
         }
       }
-    } catch (e) {
-      yield '\n⚠️ Error connecting to model: $e';
+    } catch (error) {
+      debugPrint('LLMService.streamEmotionalBudResponse error: $error');
+      yield '\nI couldn\'t generate a reply from the on-device model. '
+          'Please try again, and check that the model is downloaded correctly '
+          'if the problem continues.';
     }
   }
 

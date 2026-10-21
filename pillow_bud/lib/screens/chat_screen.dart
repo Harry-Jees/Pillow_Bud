@@ -28,10 +28,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     _controller.addListener(() {
       final hasText = _controller.text.trim().isNotEmpty;
-      if (hasText != _hasInput) {
+      if (hasText != _hasInput && mounted) {
         setState(() => _hasInput = hasText);
       }
     });
+    _loadChatHistory();
+  }
+
+  Future<void> _loadChatHistory() async {
+    final sessionId = ref.read(currentChatIdProvider);
+    try {
+      final history = await DatabaseService.getAllChatMessages(
+        sessionId: sessionId,
+      );
+      if (!mounted) return;
+      // Merge with messages sent while the database read was in flight.
+      // IDs prevent duplicate bubbles; timestamps preserve conversation order.
+      final currentMessages = ref.read(chatMessagesProvider);
+      final mergedById = <String, ChatMessage>{
+        for (final message in history) message.id: message,
+        for (final message in currentMessages) message.id: message,
+      };
+      final mergedHistory = mergedById.values.toList()
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      if (!mounted) return;
+      ref.read(chatMessagesProvider.notifier).state = mergedHistory;
+      ref.read(llmServiceProvider).restoreConversationHistory(
+        mergedHistory.map((message) => {
+          'role': message.isFromBud ? 'assistant' : 'user',
+          'content': message.text,
+        }),
+      );
+      if (mergedHistory.isNotEmpty) _scrollToBottom();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chat history could not be loaded from this device.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -252,11 +289,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogContext);
+              final sessionId = ref.read(currentChatIdProvider);
               ref.read(chatMessagesProvider.notifier).state = [];
               ref.read(currentChatEmotionProvider.notifier).state = '';
-              DatabaseService.clearAllChatMessages();
+              ref.read(llmServiceProvider).clearConversationHistory();
+              try {
+                await DatabaseService.clearAllChatMessages(
+                  sessionId: sessionId,
+                );
+              } catch (_) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Could not clear the saved chat history.'),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.danger,
