@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -400,11 +401,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
       if (result == null || result.files.single.path == null) return;
       final file = File(result.files.single.path!);
-      final passphrase = await _requestBackupPassphrase(
-        title: 'Unlock backup',
-        description: 'Enter the passphrase used when this backup was created.',
-        confirm: false,
-      );
+      final prefix = await file.openRead(0, 5).transform(utf8.decoder).join();
+      final isLegacyBackup = prefix.startsWith('PBv2:');
+      final passphrase = isLegacyBackup
+          ? ''
+          : await _requestBackupPassphrase(
+              title: 'Unlock backup',
+              description: 'Enter the passphrase used when this backup was created.',
+              confirm: false,
+            );
       if (passphrase == null || !mounted) return;
       final importResult = await BackupService.importData(
         file,
