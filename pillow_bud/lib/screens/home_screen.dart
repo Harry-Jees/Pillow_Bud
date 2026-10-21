@@ -37,6 +37,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     try {
       await DatabaseService.logMood(emoji);
     } catch (_) {}
+    ref.invalidate(moodHistoryProvider);
   }
 
   @override
