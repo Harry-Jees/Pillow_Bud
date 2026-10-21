@@ -255,9 +255,15 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                         onPressed: () {
                           final prompt = _reflectionPrompts[
                               DateTime.now().day % _reflectionPrompts.length];
-                          _controller.text = prompt;
-                          _controller.selection = TextSelection.collapsed(
-                            offset: prompt.length,
+                          final existingText = _controller.text.trimRight();
+                          final updatedText = existingText.isEmpty
+                              ? prompt
+                              : '$existingText\n\n$prompt';
+                          _controller.value = TextEditingValue(
+                            text: updatedText,
+                            selection: TextSelection.collapsed(
+                              offset: updatedText.length,
+                            ),
                           );
                         },
                         icon: const Icon(Icons.lightbulb_outline_rounded, size: 17),
