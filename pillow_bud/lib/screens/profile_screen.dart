@@ -381,8 +381,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final displayName = userName.isNotEmpty ? userName : 'Pillow Bud Friend';
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
           'Profile & Settings',
