@@ -4,6 +4,7 @@ import 'package:pillow_bud/providers/app_state_provider.dart';
 import 'package:pillow_bud/providers/theme_provider.dart';
 import 'package:pillow_bud/services/database/database_service.dart';
 import 'package:pillow_bud/theme/app_colors.dart';
+import 'package:pillow_bud/widgets/calm_moment_sheet.dart';
 
 import 'chat_screen.dart';
 import 'journal_screen.dart';
@@ -155,6 +156,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _showCalmMoment() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (_) => const CalmMomentSheet(),
     );
   }
 
@@ -451,7 +462,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(height: 24),
 
-          // 5. Daily Prompt Card
+          // 5. Calm Studio entry point
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _showCalmMoment,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.all(17),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: primary.withValues(alpha: 0.22)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(Icons.spa_rounded, color: primary, size: 23),
+                    ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Need a moment?',
+                            style: TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDarkMode
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Try guided breathing or a grounding exercise',
+                            style: TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 12,
+                              height: 1.35,
+                              color: isDarkMode
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.arrow_forward_ios_rounded,
+                        size: 16, color: primary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 6. Daily Prompt Card
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
