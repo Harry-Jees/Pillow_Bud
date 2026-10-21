@@ -42,7 +42,7 @@ class CrisisDetector {
         .toLowerCase()
         .replaceAll('’', "'")
         .replaceAll(RegExp(r'[.,!?;:()"]'), ' ')
-        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
     // Avoid raising the emergency overlay for a standalone, explicit denial.
