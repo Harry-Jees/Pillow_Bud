@@ -42,18 +42,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         sessionId: sessionId,
       );
       if (!mounted) return;
-      // Do not overwrite messages if the user has already started chatting
-      // while the database read was in flight.
-      if (ref.read(chatMessagesProvider).isEmpty) {
-        ref.read(chatMessagesProvider.notifier).state = history;
-        ref.read(llmServiceProvider).restoreConversationHistory(
-          history.map((message) => {
-            'role': message.isFromBud ? 'assistant' : 'user',
-            'content': message.text,
-          }),
-        );
-        if (history.isNotEmpty) _scrollToBottom();
-      }
+      // Merge with messages sent while the database read was in flight.
+      // IDs prevent duplicate bubbles; timestamps preserve conversation order.
+      final currentMessages = ref.read(chatMessagesProvider);
+      final mergedById = <String, ChatMessage>{
+        for (final message in history) message.id: message,
+        for (final message in currentMessages) message.id: message,
+      };
+      final mergedHistory = mergedById.values.toList()
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      if (!mounted) return;
+      ref.read(chatMessagesProvider.notifier).state = mergedHistory;
+      ref.read(llmServiceProvider).restoreConversationHistory(
+        mergedHistory.map((message) => {
+          'role': message.isFromBud ? 'assistant' : 'user',
+          'content': message.text,
+        }),
+      );
+      if (mergedHistory.isNotEmpty) _scrollToBottom();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
