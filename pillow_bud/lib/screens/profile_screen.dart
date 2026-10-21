@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -48,7 +50,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (mounted) {
       setState(() {
         _biometricHardwareStatus = hwStatus;
-                _biometricEnabled = biometricEnabled;
+        _biometricEnabled = biometricEnabled;
         _notificationsEnabled = notificationsEnabled;
         _reminderTime = reminderTime;
       });
@@ -278,35 +280,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _exportBackup() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Export an unencrypted backup?'),
-        content: const Text(
-          'The current backup file is not encrypted. It may contain private '
-          'chat, journal, and mood data. Only save or share it somewhere you trust.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Export anyway'),
-          ),
-        ],
-      ),
+    final passphrase = await _requestBackupPassphrase(
+      title: 'Protect your backup',
+      description: 'Create a passphrase with at least 10 characters. You will need it to restore this backup on any device. Pillow Bud cannot recover a forgotten passphrase.',
+      confirm: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (passphrase == null || !mounted) return;
 
     setState(() => _isExporting = true);
     try {
-      final file = await BackupService.exportData();
+      final file = await BackupService.exportData(passphrase: passphrase);
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'Pillow Bud Backup',
-        text: 'Pillow Bud backup — this file is not encrypted. Keep it private.',
+        subject: 'Pillow Bud Encrypted Backup',
+        text: 'Pillow Bud encrypted backup. Keep your passphrase separate and private.',
       );
     } catch (e) {
       if (mounted) {
@@ -317,6 +304,84 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
+  }
+
+  Future<String?> _requestBackupPassphrase({
+    required String title,
+    required String description,
+    required bool confirm,
+  }) async {
+    final controller = TextEditingController();
+    final confirmation = TextEditingController();
+    String? result;
+    try {
+      result = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(description),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  obscureText: true,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Backup passphrase',
+                    helperText: 'At least 10 characters',
+                  ),
+                ),
+                if (confirm) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: confirmation,
+                    obscureText: true,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm passphrase',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = controller.text;
+                if (value.trim().length < 10 ||
+                    (confirm && value != confirmation.text)) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(value.trim().length < 10
+                          ? 'Use at least 10 characters.'
+                          : 'The passphrases do not match.'),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, value);
+              },
+              child: Text(confirm ? 'Encrypt Backup' : 'Unlock Backup'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+      confirmation.dispose();
+    }
+    return result;
   }
 
   Future<void> _importBackup() async {
@@ -337,12 +402,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
       if (result == null || result.files.single.path == null) return;
       final file = File(result.files.single.path!);
-      final importResult = await BackupService.importData(file);
+      final prefix = await file.openRead(0, 5).transform(utf8.decoder).join();
+      final isLegacyBackup = prefix.startsWith('PBv2:');
+      final passphrase = isLegacyBackup
+          ? ''
+          : await _requestBackupPassphrase(
+              title: 'Unlock backup',
+              description: 'Enter the passphrase used when this backup was created.',
+              confirm: false,
+            );
+      if (passphrase == null || !mounted) return;
+      final importResult = await BackupService.importData(
+        file,
+        passphrase: passphrase,
+      );
+      ref.read(journalEntriesProvider.notifier).state =
+          await DatabaseService.getAllJournalEntries();
+      final restoredMessages = await DatabaseService.getAllChatMessages(
+        sessionId: ref.read(currentChatIdProvider),
+      );
+      ref.read(chatMessagesProvider.notifier).state = restoredMessages;
+      ref.read(llmServiceProvider).restoreConversationHistory(
+        restoredMessages.map((message) => {
+          'role': message.isFromBud ? 'assistant' : 'user',
+          'content': message.text,
+        }),
+      );
+      ref.invalidate(moodHistoryProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Restored ${importResult.chats} chats, ${importResult.journals} journals, ${importResult.moods} mood logs.',
+              'Restored ${importResult.chats} messages, ${importResult.journals} journal entries, and ${importResult.moods} mood check-ins.',
             ),
           ),
         );
@@ -381,8 +472,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final displayName = userName.isNotEmpty ? userName : 'Pillow Bud Friend';
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
           'Profile & Settings',
@@ -1390,7 +1480,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           size: 18, color: AppColors.success),
                       const SizedBox(width: 8),
                       Text(
-                        '100% Private, Local & Cross-Platform',
+                        'Local-first privacy',
                         style: TextStyle(
                           fontFamily: 'DM Sans',
                           fontSize: 13,
@@ -1404,7 +1494,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Built with Material 3 for Android, iOS, Windows, macOS, Linux, and Web. Zero analytics trackers and zero third-party cloud uploads.',
+                    'Chat inference is designed to run on your device after the model is downloaded. Internet access is needed for model downloads, and platform support depends on native plugin and toolchain compatibility. Pillow Bud is not a medical or emergency service.',
                     style: TextStyle(
                       fontFamily: 'DM Sans',
                       fontSize: 12,

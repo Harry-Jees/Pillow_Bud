@@ -11,45 +11,60 @@ class InsightsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = ref.watch(journalEntriesProvider);
+    final moodLogs =
+        ref.watch(moodHistoryProvider).asData?.value ?? <Map<String, dynamic>>[];
     final isDarkMode = ref.watch(isDarkModeProvider);
     final themeColors = ref.watch(currentThemeProvider);
     final primary = themeColors['primary'] ?? AppColors.primary;
 
-    final streak = DateUtils.calculateStreak(
-      entries.map((entry) => entry.dateCreated).toList(),
-    );
+    final checkInDates = <DateTime>[
+      ...entries.map((entry) => entry.dateCreated),
+      ...moodLogs.where((log) => log['timestamp'] is num).map(
+            (log) => DateTime.fromMillisecondsSinceEpoch(
+              (log['timestamp'] as num).toInt(),
+            ),
+          ),
+    ].map((date) => DateTime(date.year, date.month, date.day)).toSet().toList();
+    final streak = DateUtils.calculateStreak(checkInDates);
 
     final recentDays = List.generate(7, (index) {
       final date = DateTime.now().subtract(Duration(days: 6 - index));
       final dayLabel =
           ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][date.weekday - 1];
-      final dayEntries = entries.where((entry) {
-        final created = entry.dateCreated;
+      final dayMoods = moodLogs.where((log) {
+        final timestamp = log['timestamp'];
+        if (timestamp is! num) return false;
+        final created = DateTime.fromMillisecondsSinceEpoch(timestamp.toInt());
         return created.year == date.year &&
             created.month == date.month &&
             created.day == date.day;
       }).toList();
 
-      final score = dayEntries.isEmpty
-          ? 0.08
-          : (dayEntries.length * 0.35).clamp(0.2, 1.0);
-      final emoji = dayEntries.isNotEmpty ? dayEntries.first.mood : '—';
+      // This is a check-in frequency bar, not an inferred mood score.
+      final score = dayMoods.isEmpty
+          ? 0.0
+          : (dayMoods.length / 3).clamp(0.0, 1.0).toDouble();
+      final emoji = dayMoods.isNotEmpty
+          ? dayMoods.first['mood'] as String? ?? '—'
+          : '—';
       return {
         'label': dayLabel,
         'score': score,
         'emoji': emoji,
-        'count': dayEntries.length
+        'count': dayMoods.length
       };
     });
 
     final moodCounts = <String, int>{};
-    for (final entry in entries) {
-      moodCounts[entry.mood] = (moodCounts[entry.mood] ?? 0) + 1;
+    for (final log in moodLogs) {
+      final mood = log['mood'];
+      if (mood is String && mood.isNotEmpty) {
+        moodCounts[mood] = (moodCounts[mood] ?? 0) + 1;
+      }
     }
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
           'Your Insights',
@@ -115,7 +130,7 @@ class InsightsScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Consistent check-ins deepen emotional self-awareness',
+                        'Small, regular check-ins help you notice how you feel over time',
                         style: TextStyle(
                           fontFamily: 'DM Sans',
                           fontSize: 12,
@@ -133,7 +148,7 @@ class InsightsScreen extends ConsumerWidget {
 
             // 2. Weekly Mood Flow
             Text(
-              'WEEKLY ACTIVITY & MOOD',
+              'WEEKLY MOOD CHECK-INS',
               style: TextStyle(
                 fontFamily: 'DM Sans',
                 fontSize: 11,
@@ -191,15 +206,22 @@ class InsightsScreen extends ConsumerWidget {
                               color: isDarkMode
                                   ? Colors.white.withValues(alpha: 0.08)
                                   : Colors.black.withValues(alpha: 0.05),
-                              child: FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor: score,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: primary,
-                                    borderRadius: BorderRadius.circular(6),
+                              child: TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0.0, end: score),
+                                  duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+                                      ? Duration.zero
+                                      : const Duration(milliseconds: 650),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (context, animatedScore, _) => FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: animatedScore,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: primary,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
                                   ),
-                                ),
                               ),
                             ),
                           ),
@@ -251,7 +273,7 @@ class InsightsScreen extends ConsumerWidget {
                 ),
                 child: Center(
                   child: Text(
-                    'No journal logs yet. Write your first encrypted reflection to view patterns.',
+                    'No mood check-ins yet. Choose how you feel on Home to begin building your private mood history.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'DM Sans',
@@ -280,7 +302,7 @@ class InsightsScreen extends ConsumerWidget {
                 child: Column(
                   children: moodCounts.entries.map((entry) {
                     final percentage =
-                        ((entry.value / entries.length) * 100).toStringAsFixed(0);
+                        ((entry.value / moodLogs.length) * 100).toStringAsFixed(0);
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(

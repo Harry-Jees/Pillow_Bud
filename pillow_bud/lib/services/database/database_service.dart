@@ -142,10 +142,27 @@ class DatabaseService {
 
     final List<ChatMessage> messages = [];
     for (final row in maps) {
-      final text = await EncryptionService.decrypt(
+      final text = await _decryptAndMigrateField(
+        table: 'chat_messages',
+        id: row['id'] as String,
+        column: 'ciphertext',
+        ivColumn: 'iv',
         ciphertext: row['ciphertext'] as String,
-        ivBase64: row['iv'] as String,
+        ivValue: row['iv'] as String,
       );
+
+      final moodValue = row['mood'] as String?;
+      if (moodValue != null && moodValue.isNotEmpty) {
+        await _decryptAndMigrateField(
+          table: 'chat_messages',
+          id: row['id'] as String,
+          column: 'mood',
+          ivColumn: 'mood_iv',
+          ciphertext: moodValue,
+          ivValue: row['mood_iv'] as String?,
+          plaintextWhenIvMissing: true,
+        );
+      }
 
       messages.add(ChatMessage(
         id: row['id'] as String,
@@ -157,6 +174,36 @@ class DatabaseService {
     }
 
     return messages;
+  }
+
+  /// Lists persisted conversations newest-first without exposing message bodies
+  /// to SQL; titles are derived only after authenticated decryption.
+  static Future<List<Map<String, dynamic>>> getChatSessions() async {
+    if (!isInitialized) return [];
+    final groups = await _db!.rawQuery(
+      'SELECT session_id, MAX(timestamp) AS last_activity, COUNT(*) AS message_count '
+      'FROM chat_messages GROUP BY session_id ORDER BY last_activity DESC',
+    );
+    final sessions = <Map<String, dynamic>>[];
+    for (final group in groups) {
+      final id = group['session_id'] as String?;
+      if (id == null || id.isEmpty) continue;
+      final messages = await getAllChatMessages(sessionId: id);
+      final firstUser = messages.where((message) => !message.isFromBud);
+      final firstText = firstUser.isEmpty ? 'Quiet conversation' : firstUser.first.text;
+      final title = firstText.replaceAll(RegExp(r'\s+'), ' ').trim();
+      sessions.add({
+        'id': id,
+        'title': title.isEmpty
+            ? 'Quiet conversation'
+            : title.length > 42
+                ? '${title.substring(0, 39)}…'
+                : title,
+        'last_activity': group['last_activity'] as int? ?? 0,
+        'message_count': group['message_count'] as int? ?? messages.length,
+      });
+    }
+    return sessions;
   }
 
   static Future<void> clearAllChatMessages({String? sessionId}) async {
@@ -197,18 +244,24 @@ class DatabaseService {
     final List<JournalEntry> entries = [];
 
     for (final row in maps) {
-      final text = await EncryptionService.decrypt(
+      final text = await _decryptAndMigrateField(
+        table: 'journal_entries',
+        id: row['id'] as String,
+        column: 'ciphertext',
+        ivColumn: 'iv',
         ciphertext: row['ciphertext'] as String,
-        ivBase64: row['iv'] as String,
+        ivValue: row['iv'] as String,
       );
 
-      final moodIv = row['mood_iv'] as String?;
-      final mood = moodIv == null || moodIv.isEmpty
-          ? row['mood'] as String
-          : await EncryptionService.decrypt(
-              ciphertext: row['mood'] as String,
-              ivBase64: moodIv,
-            );
+      final mood = await _decryptAndMigrateField(
+        table: 'journal_entries',
+        id: row['id'] as String,
+        column: 'mood',
+        ivColumn: 'mood_iv',
+        ciphertext: row['mood'] as String,
+        ivValue: row['mood_iv'] as String?,
+        plaintextWhenIvMissing: true,
+      );
 
       entries.add(JournalEntry(
         id: row['id'] as String,
@@ -282,12 +335,26 @@ class DatabaseService {
     final result = <Map<String, dynamic>>[];
     for (final source in rows) {
       final row = Map<String, dynamic>.from(source);
-      final moodIv = row['mood_iv'] as String?;
-      // Rows created before schema v2 stored mood labels in plaintext.
-      if (moodIv != null && moodIv.isNotEmpty) {
-        row['mood'] = await EncryptionService.decrypt(
-          ciphertext: row['mood'] as String,
-          ivBase64: moodIv,
+      // Older schema rows may contain plaintext mood labels; migrate them
+      // to authenticated ciphertext the first time they are read.
+      row['mood'] = await _decryptAndMigrateField(
+        table: 'mood_logs',
+        id: row['id'] as String,
+        column: 'mood',
+        ivColumn: 'mood_iv',
+        ciphertext: row['mood'] as String,
+        ivValue: row['mood_iv'] as String?,
+        plaintextWhenIvMissing: true,
+      );
+      final noteCiphertext = row['note_ciphertext'] as String?;
+      if (noteCiphertext != null && noteCiphertext.isNotEmpty) {
+        row['note'] = await _decryptAndMigrateField(
+          table: 'mood_logs',
+          id: row['id'] as String,
+          column: 'note_ciphertext',
+          ivColumn: 'iv',
+          ciphertext: noteCiphertext,
+          ivValue: row['iv'] as String?,
         );
       }
       result.add(row);
@@ -295,7 +362,57 @@ class DatabaseService {
     return result;
   }
 
+  /// Reads an encrypted field and upgrades legacy unauthenticated records in place.
+  ///
+  /// Fields with [plaintextWhenIvMissing] are known legacy metadata columns that
+  /// were stored as plaintext before schema v2. Other fields with a missing IV
+  /// fail closed instead of guessing how the value was encoded.
+  static Future<String> _decryptAndMigrateField({
+    required String table,
+    required String id,
+    required String column,
+    required String ivColumn,
+    required String ciphertext,
+    required String? ivValue,
+    bool plaintextWhenIvMissing = false,
+  }) async {
+    if (ciphertext.isEmpty) return '';
+
+    final hasIv = ivValue != null && ivValue.isNotEmpty;
+    final plaintextLegacy = !hasIv && plaintextWhenIvMissing;
+    if (!hasIv && !plaintextLegacy) {
+      throw const FormatException('Encrypted record is missing its IV.');
+    }
+
+    final plaintext = plaintextLegacy
+        ? ciphertext
+        : await EncryptionService.decrypt(
+            ciphertext: ciphertext,
+            ivBase64: ivValue!,
+          );
+
+    // Authenticated records already use the IV-plus-MAC format.
+    if (hasIv && ivValue!.contains('.')) return plaintext;
+
+    final upgraded = await EncryptionService.encrypt(plaintext);
+    await _db!.update(
+      table,
+      {column: upgraded['ciphertext'], ivColumn: upgraded['iv']},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return plaintext;
+  }
+
   // ==================== RAW-ROW HELPERS (for BackupService) ====================
+
+  /// Encrypts a legacy plaintext metadata field for safe inclusion in backups.
+  ///
+  /// This helper does not make the backup archive itself encrypted; it only
+  /// protects the supplied field using the current installation key.
+  static Future<Map<String, String>> encryptBackupField(String plaintext) {
+    return EncryptionService.encrypt(plaintext);
+  }
 
   /// Returns raw encrypted rows from [chat_messages] without decrypting.
   static Future<List<Map<String, dynamic>>> getRawChatMessageRows() async {
@@ -313,6 +430,39 @@ class DatabaseService {
   static Future<List<Map<String, dynamic>>> getRawMoodRows() async {
     if (!isInitialized) return [];
     return await _db!.query('mood_logs', orderBy: 'timestamp DESC');
+  }
+
+  /// Restores a validated set of raw encrypted rows atomically.
+  ///
+  /// If any row violates the database schema, SQLite rolls back every table
+  /// write. This prevents a backup import from leaving a half-restored database.
+  static Future<void> restoreRawRowsTransaction({
+    required Map<String, List<Map<String, dynamic>>> rowsByTable,
+  }) async {
+    if (!isInitialized) {
+      throw StateError('DatabaseService must be initialized before restoring a backup.');
+    }
+
+    const allowedTables = <String>{
+      'chat_messages',
+      'journal_entries',
+      'mood_logs',
+    };
+    if (rowsByTable.keys.any((table) => !allowedTables.contains(table))) {
+      throw ArgumentError('Backup contains an unsupported database table.');
+    }
+
+    await _db!.transaction((txn) async {
+      for (final entry in rowsByTable.entries) {
+        for (final row in entry.value) {
+          await txn.insert(
+            entry.key,
+            row,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      }
+    });
   }
 
   /// Generic INSERT OR REPLACE – used by BackupService during import to restore

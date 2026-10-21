@@ -43,8 +43,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       userName: name,
       buddyPersonality: selectedPersonality,
       isDarkMode: true,
-      primaryColor: '#C4A8F8',
-      secondaryColor: '#89C4F8',
+      primaryColor: '#8B78D6',
+      secondaryColor: '#76B8E8',
       onboardingCompleted: true,
       onboardingCompletedAt: now,
     );
@@ -71,7 +71,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         pageBuilder: (_, __, ___) => const HomeScreen(),
         transitionsBuilder: (_, animation, __, child) =>
             FadeTransition(opacity: animation, child: child),
-        transitionDuration: const Duration(milliseconds: 350),
+        transitionDuration: MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : const Duration(milliseconds: 350),
       ),
     );
   }
@@ -79,7 +81,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void _nextPage() {
     if (_currentPage < 5) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
+        duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
       );
     } else {
@@ -94,8 +98,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final isDarkMode = ref.watch(isDarkModeProvider);
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -106,7 +109,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 children: List.generate(6, (index) {
                   final isActive = index <= _currentPage;
                   return Expanded(
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+                          ? Duration.zero
+                          : const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
                       height: 4,
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(

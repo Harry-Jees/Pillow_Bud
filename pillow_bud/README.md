@@ -1,36 +1,39 @@
-# Pillow Bud Flutter application
+# Pillow Bud — Flutter application
 
-This directory contains the Flutter app source and platform projects.
+This directory contains the Flutter app source, native platform projects, assets, and tests. The repository root contains the project overview and community policies.
 
 ## Prerequisites
 
-- Flutter SDK compatible with the Dart SDK constraint in `pubspec.yaml`
-- Android Studio / Android SDK for Android builds
+- Flutter SDK compatible with the Dart constraint in `pubspec.yaml`
+- Android Studio and Android SDK for Android builds
 - Xcode for iOS and macOS builds
-- The relevant desktop toolchain for Windows or Linux
+- Visual Studio build tools for Windows
+- Required C/C++ build tooling and GTK development libraries for Linux
 
-## Setup
+Exact plugin support and system requirements vary by Flutter and dependency version. Web is not supported because the app depends on native local inference and storage/database APIs.
+
+## Setup and verification
+
+Run from this directory:
 
 ```bash
 flutter pub get
+dart format lib test
 flutter analyze
 flutter test
 flutter run
 ```
 
-## Local AI
+## Local AI model
 
-The app currently downloads the Qwen3 4B Instruct quantized GGUF model through `ModelDownloadService` and runs it through `llama_cpp` on supported native platforms. The model is large and requires additional storage and memory. Model download is not needed to compile the app, but AI chat requires a valid downloaded model.
+The app downloads a Qwen3 4B Instruct quantized GGUF model through `ModelDownloadService` and runs it through `llama_cpp` on supported native platforms. The model is large and needs additional storage and memory. Downloading requires internet access; chatting requires a valid model file. A successful model download does not guarantee that inference will work on every device.
 
-## Platform support
+## Data and backups
 
-Native platforms are the intended target. Web support is not guaranteed because local inference, file access, secure storage, and database services rely on platform-specific APIs.
+Sensitive SQLite fields use authenticated encryption for new records; legacy records may remain unauthenticated until migrated. Chat and journal payloads are also stored encrypted in SharedPreferences, which duplicates some persistence. PBv3 backups are passphrase-protected and portable in design; PBv2 is a legacy same-installation format. Backup round trips and cross-install restore must be tested before relying on them as the only copy of important data.
 
-## Security notes
+## Release notes
 
-- Secure key storage is required for encrypted database records; encryption must fail closed if the OS secure store is unavailable.
-- Existing records written by older versions may use unauthenticated encryption.
-- The current backup export is Base64-encoded rather than encrypted. Treat exported files as sensitive.
-- Release Android builds require a private signing configuration in `android/key.properties`.
+Android release signing requires a private configuration in `android/key.properties` and a private keystore. Never commit either. Build commands and manual checks are documented in `../docs/TESTING.md`.
 
-See the repository root README and `../docs/ARCHITECTURE.md` for the project overview.
+See the root [README](../README.md), [architecture reference](../docs/ARCHITECTURE.md), and [security policy](../SECURITY.md).

@@ -6,9 +6,9 @@ import 'package:pillow_bud/theme/app_colors.dart';
 final themePresets = <String, Map<String, dynamic>>{
   'lavender': {
     'name': 'Lavender Mist',
-    'primary': const Color(0xFFC4A8F8),
-    'secondary': const Color(0xFF89C4F8),
-    'tertiary': const Color(0xFFA8D8A8),
+    'primary': AppColors.primary,
+    'secondary': AppColors.secondary,
+    'tertiary': AppColors.tertiary,
   },
   'ocean': {
     'name': 'Ocean Deep',

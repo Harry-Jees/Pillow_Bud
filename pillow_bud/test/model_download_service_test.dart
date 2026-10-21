@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pillow_bud/services/ai/model_download_service.dart';
 
@@ -19,6 +21,31 @@ void main() {
         ModelDownloadService.modelFileName.endsWith('.gguf'),
         isTrue,
       );
+    });
+
+    test('GGUF validation accepts the expected container signature', () async {
+      final directory = await Directory.systemTemp.createTemp('pillow_bud_gguf_');
+      try {
+        final file = File('${directory.path}/valid.gguf');
+        await file.writeAsBytes([0x47, 0x47, 0x55, 0x46, 0x00]);
+        expect(await ModelDownloadService.hasGgufMagic(file), isTrue);
+      } finally {
+        await directory.delete(recursive: true);
+      }
+    });
+
+    test('GGUF validation rejects short or unrelated files', () async {
+      final directory = await Directory.systemTemp.createTemp('pillow_bud_gguf_');
+      try {
+        final shortFile = File('${directory.path}/short.gguf');
+        await shortFile.writeAsBytes([0x47, 0x47, 0x55]);
+        final unrelatedFile = File('${directory.path}/html.gguf');
+        await unrelatedFile.writeAsString('<html>not a model</html>');
+        expect(await ModelDownloadService.hasGgufMagic(shortFile), isFalse);
+        expect(await ModelDownloadService.hasGgufMagic(unrelatedFile), isFalse);
+      } finally {
+        await directory.delete(recursive: true);
+      }
     });
 
     test('Initial download status is a valid state', () {

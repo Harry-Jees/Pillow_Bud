@@ -57,7 +57,42 @@ void main() {
       );
     });
 
+    test('Legacy IV-only records remain readable for migration', () async {
+      const plainText = 'legacy journal entry';
+      final encrypted = await EncryptionService.encrypt(plainText);
+      final legacyIv = encrypted['iv']!.split('.').first;
+
+      expect(
+        await EncryptionService.decrypt(
+          ciphertext: encrypted['ciphertext']!,
+          ivBase64: legacyIv,
+        ),
+        equals(plainText),
+      );
+    });
+
+    test('Tampered authentication tag is rejected', () async {
+      final encrypted = await EncryptionService.encrypt('private journal');
+      final separator = encrypted['iv']!.indexOf('.');
+      final iv = encrypted['iv']!.substring(0, separator);
+      final mac = encrypted['iv']!.substring(separator + 1);
+      final replacement = mac.startsWith('0') ? '1' : '0';
+      final tamperedIv = '$iv.$replacement${mac.substring(1)}';
+
+      await expectLater(
+        EncryptionService.decrypt(
+          ciphertext: encrypted['ciphertext']!,
+          ivBase64: tamperedIv,
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
     test('Empty strings round-trip without key access', () async {
+      // Reset the injected test key to prove empty values do not need secure storage.
+      EncryptionService.reset();
+      SecureKeyStorage.resetCache();
+
       final encrypted = await EncryptionService.encrypt('');
       expect(encrypted['ciphertext'], isEmpty);
       expect(encrypted['iv'], isEmpty);

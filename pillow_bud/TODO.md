@@ -1,11 +1,13 @@
-# Pillow Bud — implementation backlog
+# Pillow Bud app follow-up
 
-Use the repository-root `TODO.md` for the consolidated maintenance checklist.
+See the repository-root [TODO.md](../TODO.md) for the consolidated maintenance and release checklist.
 
-## App-specific follow-up
-- [ ] Add passphrase-protected, authenticated, portable backup export/import. The current export is Base64-encoded and unencrypted.
-- [ ] Consolidate duplicate chat/journal persistence from SharedPreferences and SQLite into one repository layer.
-- [ ] Add a migration that authenticates/re-encrypts legacy records before removing the legacy CBC-only read path.
-- [ ] Add tests for schema migration, backup corruption, and import across a clean installation.
-- [ ] Verify Android, iOS, Windows, macOS, and Linux builds with the actual Flutter SDK/toolchains.
-- [ ] Verify local inference memory use and download integrity on representative devices.
+App-specific outstanding work:
+- [ ] Run Flutter analysis and all tests with a compatible SDK.
+- [ ] Test portable PBv3 backups end-to-end, including wrong passphrases, corruption, and restoring to a clean installation.
+- [ ] Test PBv2 compatibility against a real legacy backup from a previous release.
+- [ ] Consolidate duplicate chat/journal persistence from SQLite and SharedPreferences.
+- [ ] Test schema migrations and legacy encrypted/plaintext field handling.
+- [ ] Evaluate local model quality, memory use, cancellation, interrupted downloads, and failure recovery on representative devices.
+- [ ] Verify crisis-detection false positives/negatives and resource copy.
+- [ ] Smoke-test Android, Windows, Linux, macOS, and iOS only on their supported toolchains; do not claim a target is verified until its build and runtime checks pass.

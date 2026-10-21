@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:pillow_bud/models/chat_message.dart';
 import 'package:pillow_bud/providers/app_state_provider.dart';
 import 'package:pillow_bud/providers/llm_provider.dart';
@@ -22,6 +23,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _hasInput = false;
+  bool _isPreparingSend = false;
+  late Future<void> _historyLoadFuture;
   int _historyGeneration = 0;
 
   @override
@@ -33,20 +36,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         setState(() => _hasInput = hasText);
       }
     });
-    _loadChatHistory();
+    _historyLoadFuture = _loadChatHistory();
   }
 
   Future<void> _loadChatHistory() async {
     final generation = _historyGeneration;
     final sessionId = ref.read(currentChatIdProvider);
+
+    // The splash screen may have preloaded messages from more than one chat.
+    // Keep the active screen and model context isolated to this session.
+    final sessionMessages = ref
+        .read(chatMessagesProvider)
+        .where((message) => message.sessionId == sessionId)
+        .toList();
+    ref.read(chatMessagesProvider.notifier).state = sessionMessages;
+
     try {
       final history = await DatabaseService.getAllChatMessages(
         sessionId: sessionId,
       );
       if (!mounted || generation != _historyGeneration) return;
-      // Merge with messages sent while the database read was in flight.
-      // IDs prevent duplicate bubbles; timestamps preserve conversation order.
-      final currentMessages = ref.read(chatMessagesProvider);
+      // Merge only this session's messages sent while the database read was
+      // in flight. IDs prevent duplicates; timestamps preserve conversation order.
+      final currentMessages = ref
+          .read(chatMessagesProvider)
+          .where((message) => message.sessionId == sessionId);
       final mergedById = <String, ChatMessage>{
         for (final message in history) message.id: message,
         for (final message in currentMessages) message.id: message,
@@ -75,6 +89,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    ref.read(isLoadingChatProvider.notifier).state = false;
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -93,92 +108,192 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _send() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-
-    final sessionId = ref.read(currentChatIdProvider);
-    final isCrisis = CrisisDetector.detect(text);
-    final analysis = EmotionDetector.analyze(text);
-    final detectedEmotion = analysis['emotion'] as String;
-    final intensity = analysis['intensity'] as double;
-
-    ref.read(currentChatEmotionProvider.notifier).state =
-        detectedEmotion != 'neutral' ? detectedEmotion : '';
-
-    final userMessage = ChatMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      text: text,
-      isFromBud: false,
-      timestamp: DateTime.now(),
-      sessionId: sessionId,
-    );
-
-    // Update state
-    ref.read(chatMessagesProvider.notifier).state = [
-      ...ref.read(chatMessagesProvider),
-      userMessage,
-    ];
-
-    _controller.clear();
-    setState(() => _hasInput = false);
-    _scrollToBottom();
-
-    // Persist encrypted to SQLite3
-    try {
-      await DatabaseService.saveChatMessage(
-        userMessage,
-        mood: detectedEmotion,
-        intensity: intensity,
-      );
-    } catch (_) {}
-
-    // Show crisis popup if triggered
-    if (isCrisis && mounted) {
-      _showCrisisDialog();
-    }
-
-    // Trigger Bud generation
-    ref.read(isLoadingChatProvider.notifier).state = true;
-    _scrollToBottom();
+    if (_isPreparingSend || ref.read(isLoadingChatProvider)) return;
+    _isPreparingSend = true;
 
     try {
-      final responseText = await ref.read(budResponseProvider(text).future);
+      // Restore persisted context before constructing the next prompt. This
+      // avoids a first message racing the async history read on screen startup.
+      await _historyLoadFuture;
+      if (!mounted) return;
 
-      final budMessage = ChatMessage(
+      final text = _controller.text.trim();
+      if (text.isEmpty) return;
+
+      final sessionId = ref.read(currentChatIdProvider);
+      final isCrisis = CrisisDetector.detect(text);
+      final analysis = EmotionDetector.analyze(text);
+      final detectedEmotion = analysis['emotion'] as String;
+      final intensity = analysis['intensity'] as double;
+
+      ref.read(currentChatEmotionProvider.notifier).state =
+          detectedEmotion != 'neutral' ? detectedEmotion : '';
+
+      final userMessage = ChatMessage(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
-        text: responseText,
-        isFromBud: true,
+        text: text,
+        isFromBud: false,
         timestamp: DateTime.now(),
         sessionId: sessionId,
       );
 
       ref.read(chatMessagesProvider.notifier).state = [
         ...ref.read(chatMessagesProvider),
-        budMessage,
+        userMessage,
       ];
 
-      // Persist encrypted Bud message to SQLite3
+      _controller.clear();
+      setState(() => _hasInput = false);
+      _scrollToBottom();
+      // Lock out repeat submissions before any persistence/inference await.
+      ref.read(isLoadingChatProvider.notifier).state = true;
+
       try {
         await DatabaseService.saveChatMessage(
-          budMessage,
+          userMessage,
           mood: detectedEmotion,
+          intensity: intensity,
         );
-      } catch (_) {}
-    } catch (e) {
-      final errorMessage = ChatMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        text: 'I\'m here with you. Take a slow, steady breath. What feels heaviest right now?',
-        isFromBud: true,
-        timestamp: DateTime.now(),
-        sessionId: sessionId,
-      );
-      ref.read(chatMessagesProvider.notifier).state = [
-        ...ref.read(chatMessagesProvider),
-        errorMessage,
-      ];
-    } finally {
-      ref.read(isLoadingChatProvider.notifier).state = false;
+      } catch (error) {
+        debugPrint('ChatScreen: user message persistence failed: $error');
+      }
+
+      if (!mounted) return;
+
+      if (isCrisis) _showCrisisDialog();
       _scrollToBottom();
+
+      try {
+        // Stream tokens directly into one message so Bud visibly types
+        // instead of waiting for the complete model response.
+        final llm = ref.read(llmServiceProvider);
+        final budMessageId = DateTime.now().microsecondsSinceEpoch.toString();
+        var responseText = '';
+        var hasShownMessage = false;
+
+        await for (final token in llm.streamEmotionalBudResponse(
+          userMessage: text,
+          userName: ref.read(userNameProvider),
+          personalityMode: ref.read(buddyPersonalityProvider),
+        )) {
+          if (!mounted || ref.read(currentChatIdProvider) != sessionId) return;
+          responseText += token;
+          final liveMessage = ChatMessage(
+            id: budMessageId,
+            text: responseText,
+            isFromBud: true,
+            timestamp: DateTime.now(),
+            sessionId: sessionId,
+          );
+          final currentMessages = ref.read(chatMessagesProvider);
+          if (!hasShownMessage) {
+            hasShownMessage = true;
+            ref.read(chatMessagesProvider.notifier).state = [
+              ...currentMessages,
+              liveMessage,
+            ];
+          } else {
+            ref.read(chatMessagesProvider.notifier).state = [
+              for (final message in currentMessages)
+                if (message.id == budMessageId) liveMessage else message,
+            ];
+          }
+          _scrollToBottom();
+        }
+
+        if (!mounted || ref.read(currentChatIdProvider) != sessionId) return;
+        // Streaming may yield no tokens on a disposed/empty engine. Keep the
+        // chat recoverable and avoid saving an empty assistant message.
+        if (responseText.trim().isEmpty) {
+          responseText = 'I couldn\'t generate a reply this time. Please try again.';
+          final fallbackMessage = ChatMessage(
+            id: budMessageId,
+            text: responseText,
+            isFromBud: true,
+            timestamp: DateTime.now(),
+            sessionId: sessionId,
+          );
+          ref.read(chatMessagesProvider.notifier).state = [
+            ...ref.read(chatMessagesProvider),
+            fallbackMessage,
+          ];
+        }
+
+        final savedMessage = ChatMessage(
+          id: budMessageId,
+          text: responseText.trim(),
+          isFromBud: true,
+          timestamp: DateTime.now(),
+          sessionId: sessionId,
+        );
+        ref.read(chatMessagesProvider.notifier).state = [
+          for (final message in ref.read(chatMessagesProvider))
+            if (message.id == budMessageId) savedMessage else message,
+        ];
+
+        try {
+          await DatabaseService.saveChatMessage(
+            savedMessage,
+            mood: detectedEmotion,
+          );
+        } catch (error) {
+          debugPrint('ChatScreen: Bud response persistence failed: $error');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Reply shown, but could not be saved to chat history.'),
+              ),
+            );
+          }
+        }
+      } catch (error, stackTrace) {
+        debugPrint('ChatScreen: response generation failed: $error\n$stackTrace');
+        if (!mounted) return;
+
+        final errorMessage = ChatMessage(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          text: 'I\'m here with you. Take a slow, steady breath. What feels heaviest right now?',
+          isFromBud: true,
+          timestamp: DateTime.now(),
+          sessionId: sessionId,
+        );
+        ref.read(chatMessagesProvider.notifier).state = [
+          ...ref.read(chatMessagesProvider),
+          errorMessage,
+        ];
+        try {
+          await DatabaseService.saveChatMessage(errorMessage);
+        } catch (persistError) {
+          debugPrint('ChatScreen: fallback response persistence failed: $persistError');
+        }
+      } finally {
+        if (mounted) {
+          ref.read(isLoadingChatProvider.notifier).state = false;
+          _scrollToBottom();
+        }
+      }
+    } finally {
+      _isPreparingSend = false;
+    }
+  }
+
+  Future<void> _callCrisisResource(String number) async {
+    final dialableNumber = number.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri(scheme: 'tel', path: dialableNumber);
+    try {
+      final opened = await launchUrl(uri);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the phone dialer on this device.')),
+        );
+      }
+    } catch (error) {
+      debugPrint('ChatScreen: could not open crisis helpline dialer: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the phone dialer on this device.')),
+        );
+      }
     }
   }
 
@@ -208,7 +323,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'You are carrying a deep burden right now. Please know that you are not alone and free, confidential emergency support is ready 24/7:',
+              'You are carrying a deep burden right now. You deserve support. These contacts can help, and if anyone is in immediate danger in India, call 112.',
               style: TextStyle(
                 fontFamily: 'DM Sans',
                 fontSize: 13,
@@ -229,7 +344,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Column(
@@ -237,12 +351,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         children: [
                           Text(
                             resource['name']!,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontFamily: 'DM Sans',
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
+                          const SizedBox(height: 3),
                           Text(
                             resource['number']!,
                             style: TextStyle(
@@ -252,10 +367,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if ((resource['desc'] ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              resource['desc']!,
+                              style: TextStyle(
+                                fontFamily: 'DM Sans',
+                                fontSize: 10,
+                                color: Colors.white.withValues(alpha: 0.62),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                    Icon(Icons.call, color: Theme.of(dialogContext).colorScheme.primary, size: 20),
+                    IconButton(
+                      tooltip: 'Call ${resource['name']}',
+                      onPressed: () => _callCrisisResource(resource['number']!),
+                      icon: Icon(
+                        Icons.call_rounded,
+                        color: Theme.of(dialogContext).colorScheme.primary,
+                        size: 20,
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -268,6 +402,66 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: const Text('Continue Chatting'),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showConversationHistory() async {
+    final sessions = await DatabaseService.getChatSessions();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * 0.65,
+          child: Column(
+            children: [
+              ListTile(
+                title: const Text('Your conversations'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.add_comment_outlined),
+                  tooltip: 'New conversation',
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    _historyGeneration++;
+                    ref.read(currentChatIdProvider.notifier).state =
+                        'chat_${DateTime.now().microsecondsSinceEpoch}';
+                    ref.read(chatMessagesProvider.notifier).state = [];
+                    ref.read(llmServiceProvider).clearConversationHistory();
+                    _historyLoadFuture = _loadChatHistory();
+                  },
+                ),
+              ),
+              Expanded(
+                child: sessions.isEmpty
+                    ? const Center(child: Text('Saved conversations will appear here.'))
+                    : ListView.builder(
+                        itemCount: sessions.length,
+                        itemBuilder: (context, index) {
+                          final item = sessions[index];
+                          final id = item['id'] as String;
+                          return ListTile(
+                            leading: const Icon(Icons.chat_bubble_outline_rounded),
+                            title: Text(item['title'] as String? ?? 'Conversation'),
+                            subtitle: Text('${item['message_count']} messages'),
+                            onTap: () {
+                              Navigator.pop(sheetContext);
+                              if (id == ref.read(currentChatIdProvider)) return;
+                              _historyGeneration++;
+                              ref.read(currentChatIdProvider.notifier).state = id;
+                              ref.read(chatMessagesProvider.notifier).state = [];
+                              ref.read(currentChatEmotionProvider.notifier).state = '';
+                              ref.read(llmServiceProvider).clearConversationHistory();
+                              _historyLoadFuture = _loadChatHistory();
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -334,8 +528,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final primary = themeColors['primary'] ?? AppColors.primary;
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -388,8 +581,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.history_rounded, size: 22),
+            tooltip: 'Conversation history',
+            onPressed: _showConversationHistory,
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_comment_outlined, size: 22),
+            tooltip: 'New conversation',
+            onPressed: () {
+              _historyGeneration++;
+              ref.read(currentChatIdProvider.notifier).state =
+                  'chat_${DateTime.now().microsecondsSinceEpoch}';
+              ref.read(chatMessagesProvider.notifier).state = [];
+              ref.read(currentChatEmotionProvider.notifier).state = '';
+              ref.read(llmServiceProvider).clearConversationHistory();
+              _historyLoadFuture = _loadChatHistory();
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded, size: 22),
-            tooltip: 'Start Fresh',
+            tooltip: 'Clear this conversation',
             onPressed: messages.isNotEmpty ? _clearChat : null,
           ),
         ],
@@ -452,7 +663,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Share anything on your mind. All conversations are encrypted and processed 100% locally on your device.',
+              'Share anything on your mind. Your conversation stays on this device.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'DM Sans',
@@ -462,6 +673,54 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     : AppColors.textSecondaryLight,
                 height: 1.5,
               ),
+            ),
+            const SizedBox(height: 22),
+            Text(
+              'If finding the words is hard, start here',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'DM Sans',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDarkMode
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                'I need to get something off my chest.',
+                'Help me calm down for a moment.',
+                'I am feeling alone.',
+                'Help me untangle my thoughts.',
+              ].map((prompt) {
+                return ActionChip(
+                  label: Text(prompt),
+                  onPressed: () {
+                    _controller.text = prompt;
+                    _controller.selection = TextSelection.collapsed(
+                      offset: prompt.length,
+                    );
+                    setState(() => _hasInput = true);
+                    _send();
+                  },
+                  backgroundColor: primary.withValues(alpha: 0.09),
+                  side: BorderSide(
+                    color: primary.withValues(alpha: 0.22),
+                  ),
+                  labelStyle: TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 12,
+                    color: isDarkMode
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                );
+              }).toList(),
             ),
           ],
         ),
@@ -473,7 +732,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final isUser = !msg.isFromBud;
 
     if (isUser) {
-      return Padding(
+      return TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - value) * 8),
+            child: child,
+          ),
+        ),
+        child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -513,11 +785,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ],
         ),
+        ),
       );
     }
 
     // Bud Bubble
-    return Padding(
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, (1 - value) * 8),
+          child: child,
+        ),
+      ),
+      child: Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
@@ -570,6 +856,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

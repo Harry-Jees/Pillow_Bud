@@ -14,29 +14,53 @@ class CrisisDetector {
     'hurt myself',
     'self-harm',
     'self harm',
-    'cutting',
     'overdose',
     'better off dead',
-    'no way out',
-    'hopeless',
-    'giving up',
-    'goodbye everyone',
     'can\'t go on',
     'cant go on',
     'end it all',
     'no reason to live',
     'tired of living',
+    'i cannot keep myself safe',
+    "i can't keep myself safe",
+    'i have a plan to end my life',
+    'i might not be here tomorrow',
+    'i do not trust myself to stay safe',
+    "i don't trust myself to stay safe",
   ];
 
   /// Backwards-compatible entrypoint
   static bool detectCrisis(String message) => detect(message);
 
-  /// Detects if the message contains crisis-related keywords
+  /// Detects selected high-signal crisis phrases. This heuristic is not a risk assessment.
   static bool detect(String message) {
-    final lower = message.toLowerCase();
+    final lower = message
+        .toLowerCase()
+        .replaceAll('’', "'")
+        .replaceAll(RegExp(r'[.,!?;:()"]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    // Avoid raising the emergency overlay for a standalone, explicit denial.
+    // Any additional risk language in a longer message is still evaluated.
+    const explicitDenials = [
+      "i am not suicidal",
+      "i'm not suicidal",
+      "im not suicidal",
+      "i don't want to hurt myself",
+      "i do not want to hurt myself",
+      "i don't want to kill myself",
+      "i do not want to kill myself",
+      "i am not going to hurt myself",
+      "i'm not going to hurt myself",
+    ];
+    if (explicitDenials.contains(lower)) return false;
+
     final allTriggers = <String>{...Constants.crisisTriggers, ..._crisisTriggers};
     for (final trigger in allTriggers) {
-      if (lower.contains(trigger.toLowerCase())) {
+      final phrase = trigger.toLowerCase();
+      final pattern = RegExp('(^|\\s)${RegExp.escape(phrase)}(\\s|$)');
+      if (pattern.hasMatch(lower)) {
         return true;
       }
     }
@@ -50,10 +74,10 @@ Please know that your life matters, you are not alone, and there is real support
 
 Please reach out to one of these free, confidential helplines:
 
-🆘 iCall Psychosocial Helpline: 9152987821 (Mon-Sat, 8am-10pm)
-🆘 Vandrevala Foundation: +91 9999 666 555 / 1860-2662-345 (24/7)
-🆘 AASRA Suicide Prevention: 9820466726 (24/7)
-🆘 Tele-MANAS (Govt of India): 14416 (24/7 Toll-Free)
+🆘 Tele-MANAS (Govt. of India): 14416 or 1800-891-4416 (24/7, free)
+🆘 Vandrevala Foundation: +91 9999 666 555 (24/7)
+🆘 AASRA: 9820466728
+🆘 Immediate danger in India: 112
 
 You deserve compassionate, professional support. Please reach out to them now. 💙''';
   }
@@ -62,24 +86,24 @@ You deserve compassionate, professional support. Please reach out to them now. �
   static List<Map<String, String>> getResources() {
     return [
       {
-        'name': 'iCall Psychosocial Helpline',
-        'number': '9152987821',
-        'desc': 'Mon-Sat, 8am-10pm • Professional support',
+        'name': 'Tele-MANAS (National Mental Health Helpline)',
+        'number': '14416',
+        'desc': 'Free, 24/7 mental health support across India',
       },
       {
         'name': 'Vandrevala Foundation',
-        'number': '+91 9999 666 555',
+        'number': '9999666555',
         'desc': '24/7 Mental Health Helpline',
       },
       {
         'name': 'AASRA Helpline',
-        'number': '9820466726',
+        'number': '9820466728',
         'desc': '24/7 Suicide Prevention & Crisis Intervention',
       },
       {
-        'name': 'Tele-MANAS',
-        'number': '14416',
-        'desc': '24/7 National Toll-Free Mental Health Service',
+        'name': 'Emergency services (India)',
+        'number': '112',
+        'desc': 'Call if you or someone else is in immediate danger',
       },
     ];
   }

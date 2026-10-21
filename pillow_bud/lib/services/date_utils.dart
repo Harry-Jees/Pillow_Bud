@@ -2,16 +2,16 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 
 class DateUtils {
+  static DateTime _calendarDay(DateTime date) =>
+      DateTime.utc(date.year, date.month, date.day);
+
   static String formatTime(DateTime dt) {
     final now = DateTime.now();
+    final day = _calendarDay(dt);
+    final today = _calendarDay(now);
 
-    if (dt.day == now.day && dt.month == now.month && dt.year == now.year) {
-      return 'Today';
-    }
-
-    if (dt.day == now.day - 1) {
-      return 'Yesterday';
-    }
+    if (day == today) return 'Today';
+    if (day == today.subtract(const Duration(days: 1))) return 'Yesterday';
 
     return DateFormat('MMM d').format(dt);
   }
@@ -32,30 +32,26 @@ class DateUtils {
 
   static int calculateStreak(List<DateTime> dates) {
     if (dates.isEmpty) return 0;
-    if (dates.length == 1) return 1;
 
-    // Validate that dates are not null and in proper format
     try {
-      dates.sort((a, b) => b.compareTo(a));
+      // UTC calendar-day keys avoid daylight-saving duration anomalies.
+      final uniqueDays = dates.map(_calendarDay).toSet().toList()
+        ..sort((a, b) => b.compareTo(a));
 
-      int streak = 0;
-      DateTime? lastDate;
+      final today = _calendarDay(DateTime.now());
+      final mostRecent = uniqueDays.first;
 
-      for (final date in dates) {
-        if (lastDate == null) {
-          streak = 1;
-          lastDate = date;
-        } else {
-          final daysDifference = lastDate.difference(date).inDays;
-          if (daysDifference == 1) {
-            streak++;
-            lastDate = date;
-          } else {
-            break;
-          }
-        }
+      // An old streak is not presented as current after the user has been away.
+      final daysSinceLastCheckIn = today.difference(mostRecent).inDays;
+      if (daysSinceLastCheckIn < 0 || daysSinceLastCheckIn > 1) return 0;
+
+      var streak = 1;
+      var previous = mostRecent;
+      for (final day in uniqueDays.skip(1)) {
+        if (previous.difference(day).inDays != 1) break;
+        streak++;
+        previous = day;
       }
-
       return streak;
     } catch (e) {
       debugPrint('Error calculating streak: $e');

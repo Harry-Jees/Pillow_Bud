@@ -186,6 +186,41 @@ class StorageService {
     }
   }
 
+  /// Stores the user's personal coping steps encrypted at rest.
+  static Future<void> saveCopingPlan(List<String> steps) async {
+    _ensureInitialized();
+    final normalized = steps
+        .map((step) => step.trim())
+        .where((step) => step.isNotEmpty)
+        .toSet()
+        .toList();
+    final encrypted = EncryptionService.encryptSync(jsonEncode(normalized));
+    await _prefs.setString('copingPlan', jsonEncode({
+      'version': 1,
+      'ciphertext': encrypted['ciphertext'],
+      'iv': encrypted['iv'],
+    }));
+  }
+
+  static List<String> getCopingPlan() {
+    _ensureInitialized();
+    final stored = _prefs.getString('copingPlan');
+    if (stored == null || stored.isEmpty) return [];
+    try {
+      final envelope = jsonDecode(stored) as Map<String, dynamic>;
+      if (envelope['version'] != 1) return [];
+      final plaintext = EncryptionService.decryptSync(
+        ciphertext: envelope['ciphertext'] as String,
+        ivBase64: envelope['iv'] as String,
+      );
+      return (jsonDecode(plaintext) as List<dynamic>)
+          .whereType<String>()
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   // Clear all data
   static Future<void> clearAllData() async {
     _ensureInitialized();

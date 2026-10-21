@@ -48,6 +48,7 @@ class EncryptionService {
 
   /// Encrypts text and returns a Base64 ciphertext and authenticated IV value.
   static Future<Map<String, String>> encrypt(String plainText) async {
+    if (plainText.isEmpty) return {'ciphertext': '', 'iv': ''};
     await _getEncrypter();
     return encryptSync(plainText);
   }
