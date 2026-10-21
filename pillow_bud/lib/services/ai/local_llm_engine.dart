@@ -15,6 +15,7 @@ class LocalLLMEngine {
   /// The underlying llama_cpp isolate-backed context (null for dummy/unloaded engine).
   final LlamaCpp? _llama;
   Future<void> _generationTail = Future<void>.value();
+  bool _disposed = false;
 
   LocalLLMEngine._(this._llama);
 
@@ -73,6 +74,7 @@ class LocalLLMEngine {
   /// Generates a complete response for [prompt].
   Future<String> generate(String prompt) {
     return _withGenerationLock(() async {
+      if (_disposed) return '';
       final llama = _llama;
       if (llama == null) return '';
       final buffer = StringBuffer();
@@ -101,6 +103,7 @@ class LocalLLMEngine {
     await previous;
 
     try {
+      if (_disposed) return;
       final llama = _llama;
       if (llama == null) return;
       final stream = llama.answer(
@@ -132,10 +135,14 @@ class LocalLLMEngine {
 
   /// Frees native resources and resets the singleton.
   Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
     try {
-      // Do not release native state while a generation is still consuming it.
-      await _generationTail;
-      await _llama?.dispose();
+      // Queue disposal behind current inference. Queued/new requests observe
+      // _disposed and return without touching the native context.
+      await _withGenerationLock(() async {
+        await _llama?.dispose();
+      });
       debugPrint('LocalLLMEngine: disposed.');
     } catch (e) {
       debugPrint('LocalLLMEngine.dispose error: $e');
