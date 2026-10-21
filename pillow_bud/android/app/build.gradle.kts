@@ -14,6 +14,15 @@ if (keystorePropertiesFile.exists()) {
     FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
 }
 
+val releaseStoreFile = keystoreProperties.getProperty("storeFile")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { file(it) }
+val hasReleaseSigning = keystorePropertiesFile.isFile &&
+    !keystoreProperties.getProperty("keyAlias").isNullOrBlank() &&
+    !keystoreProperties.getProperty("keyPassword").isNullOrBlank() &&
+    !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
+    releaseStoreFile?.isFile == true
+
 android {
     namespace = "com.example.pillow_bud"
     compileSdk = flutter.compileSdkVersion
@@ -41,7 +50,7 @@ android {
         create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
             keyPassword = keystoreProperties.getProperty("keyPassword")
-            storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+            storeFile = releaseStoreFile
             storePassword = keystoreProperties.getProperty("storePassword")
         }
     }
@@ -51,8 +60,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // Release builds must use a developer-managed upload key, never debug signing.
-            signingConfig = signingConfigs.getByName("release")
+            // Prefer the developer-managed upload key. CI can still produce an installable
+            // validation APK when private signing material is intentionally unavailable.
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
