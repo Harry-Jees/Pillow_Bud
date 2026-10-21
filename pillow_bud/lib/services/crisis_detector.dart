@@ -37,8 +37,8 @@ class CrisisDetector {
     final allTriggers = <String>{...Constants.crisisTriggers, ..._crisisTriggers};
     for (final trigger in allTriggers) {
       final phrase = trigger.toLowerCase();
-      final escaped = RegExp.escape(phrase).replaceAll(r'\\ ', r'\\s+');
-      if (RegExp('(^|\\\\s)$escaped($|\\\\s)').hasMatch(lower)) {
+      final pattern = RegExp('(^|\\s)${RegExp.escape(phrase)}(\\s|$)');
+      if (pattern.hasMatch(lower)) {
         return true;
       }
     }
