@@ -80,7 +80,7 @@ class BackupService {
     });
     final salt = _secureRandomBytes(16);
     final ivBytes = _secureRandomBytes(16);
-    final keyMaterial = _deriveKey(passphrase, salt, 64);
+    final keyMaterial = await _deriveKey(passphrase, salt, 64);
     final encryptionKey = enc.Key(Uint8List.fromList(keyMaterial.sublist(0, 32)));
     final macKey = keyMaterial.sublist(32, 64);
     final iv = enc.IV(Uint8List.fromList(ivBytes));
@@ -155,7 +155,7 @@ class BackupService {
       if (iterations != _kdfIterations || data['kdf'] != 'PBKDF2-HMAC-SHA256') {
         throw const FormatException('Unsupported backup encryption settings.');
       }
-      final keyMaterial = _deriveKey(passphrase, salt, 64);
+      final keyMaterial = await _deriveKey(passphrase, salt, 64);
       final expectedMac = Hmac(sha256, keyMaterial.sublist(32, 64)).convert([
         ...utf8.encode('PBv3'),
         ...salt,
@@ -232,26 +232,18 @@ class BackupService {
     return List<int>.generate(length, (_) => random.nextInt(256));
   }
 
-  /// PBKDF2-HMAC-SHA256; returns [length] derived bytes.
-  static List<int> _deriveKey(String passphrase, List<int> salt, int length) {
-    final hmac = Hmac(sha256, utf8.encode(passphrase));
-    final output = <int>[];
-    var blockIndex = 1;
-    while (output.length < length) {
-      final blockInput = <int>[...salt, (blockIndex >> 24) & 255,
-        (blockIndex >> 16) & 255, (blockIndex >> 8) & 255, blockIndex & 255];
-      var u = hmac.convert(blockInput).bytes;
-      final accumulator = List<int>.from(u);
-      for (var round = 1; round < _kdfIterations; round++) {
-        u = hmac.convert(u).bytes;
-        for (var i = 0; i < accumulator.length; i++) {
-          accumulator[i] ^= u[i];
-        }
-      }
-      output.addAll(accumulator);
-      blockIndex++;
-    }
-    return output.sublist(0, length);
+  /// Derive the archive keys off the UI isolate to keep the app responsive.
+  static Future<List<int>> _deriveKey(
+    String passphrase,
+    List<int> salt,
+    int length,
+  ) {
+    return compute(_deriveBackupKeyWorker, {
+      'passphrase': passphrase,
+      'salt': salt,
+      'length': length,
+      'iterations': _kdfIterations,
+    });
   }
 
   static List<int> _decodeBackupBytes(Map<String, dynamic> data, String key) {
@@ -328,4 +320,35 @@ class ImportResult {
   String toString() =>
       'ImportResult(chats: $chats, journals: $journals, moods: $moods, '
       'skipped: $skippedTotal)';
+}
+
+/// Isolate entrypoint for PBKDF2-HMAC-SHA256.
+List<int> _deriveBackupKeyWorker(Map<String, Object> arguments) {
+  final passphrase = arguments['passphrase'] as String;
+  final salt = (arguments['salt'] as List).cast<int>();
+  final length = arguments['length'] as int;
+  final iterations = arguments['iterations'] as int;
+  final hmac = Hmac(sha256, utf8.encode(passphrase));
+  final output = <int>[];
+  var blockIndex = 1;
+  while (output.length < length) {
+    final blockInput = <int>[
+      ...salt,
+      (blockIndex >> 24) & 255,
+      (blockIndex >> 16) & 255,
+      (blockIndex >> 8) & 255,
+      blockIndex & 255,
+    ];
+    var u = hmac.convert(blockInput).bytes;
+    final accumulator = List<int>.from(u);
+    for (var round = 1; round < iterations; round++) {
+      u = hmac.convert(u).bytes;
+      for (var i = 0; i < accumulator.length; i++) {
+        accumulator[i] ^= u[i];
+      }
+    }
+    output.addAll(accumulator);
+    blockIndex++;
+  }
+  return output.sublist(0, length);
 }
