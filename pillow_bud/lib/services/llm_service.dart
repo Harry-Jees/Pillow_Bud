@@ -87,13 +87,14 @@ class LLMService {
       response = await engine.generate(formattedPrompt);
     } on UnsupportedError {
       return '⚠️ On-device AI is not supported on this platform.';
-    } on Exception catch (e) {
-      debugPrint('LLMService: engine error – $e');
-      await LocalLLMEngine.getInstance()
-          .then((e) => e.dispose())
-          .catchError((_) {});
-      return '⚠️ Failed to connect to local model: $e\n\n'
-          'Please verify your model download in Profile & Settings.';
+    } on Exception catch (error, stackTrace) {
+      // Keep native/runtime details in diagnostic logs only. Calling
+      // getInstance() again here could initialize a second engine just to
+      // dispose it, so leave engine lifecycle management to its owner.
+      debugPrint('LLMService: local inference failed: $error\\n$stackTrace');
+      return 'The on-device model could not generate a reply. '
+          'Please try again. If this keeps happening, verify the model download '
+          'and make sure your device has enough free memory.';
     }
 
     response = _cleanModelOutput(response);
