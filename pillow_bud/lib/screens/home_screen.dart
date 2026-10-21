@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pillow_bud/providers/app_state_provider.dart';
 import 'package:pillow_bud/providers/theme_provider.dart';
@@ -121,41 +124,162 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
 
         return Scaffold(
-          backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
-          body: _buildScreenTransition(screens[_tabIndex]),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _tabIndex,
-            onDestinationSelected: (i) => setState(() => _tabIndex = i),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Home',
+          extendBody: true,
+          backgroundColor:
+              isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Padding(
+                // Keep scrollable content clear of the floating glass dock.
+                padding: const EdgeInsets.only(bottom: 106),
+                child: _buildScreenTransition(screens[_tabIndex]),
               ),
-              NavigationDestination(
-                icon: Icon(Icons.chat_bubble_outline),
-                selectedIcon: Icon(Icons.chat_bubble),
-                label: 'Bud',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.edit_note_outlined),
-                selectedIcon: Icon(Icons.edit_note),
-                label: 'Journal',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.show_chart_outlined),
-                selectedIcon: Icon(Icons.show_chart),
-                label: 'Insights',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Me',
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 8,
+                child: _buildLiquidNavigation(primary, isDarkMode),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildLiquidNavigation(Color primary, bool isDarkMode) {
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final foreground =
+        isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final muted =
+        isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    const destinations = <({String label, IconData icon, IconData selectedIcon})>[
+      (label: 'Home', icon: CupertinoIcons.house, selectedIcon: CupertinoIcons.house_fill),
+      (label: 'Bud', icon: CupertinoIcons.chat_bubble, selectedIcon: CupertinoIcons.chat_bubble_fill),
+      (label: 'Journal', icon: CupertinoIcons.book, selectedIcon: CupertinoIcons.book_fill),
+      (label: 'Insights', icon: CupertinoIcons.chart_bar, selectedIcon: CupertinoIcons.chart_bar_fill),
+      (label: 'Me', icon: CupertinoIcons.person_crop_circle, selectedIcon: CupertinoIcons.person_crop_circle_fill),
+    ];
+
+    return Semantics(
+      container: true,
+      label: 'Main navigation',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            height: 76,
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
+            decoration: BoxDecoration(
+              color: (isDarkMode ? const Color(0xFF272333) : Colors.white)
+                  .withValues(alpha: isDarkMode ? 0.76 : 0.72),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: (isDarkMode ? Colors.white : Colors.white)
+                    .withValues(alpha: isDarkMode ? 0.16 : 0.78),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDarkMode ? 0.22 : 0.10),
+                  blurRadius: 32,
+                  spreadRadius: -8,
+                  offset: const Offset(0, 12),
+                ),
+                BoxShadow(
+                  color: primary.withValues(alpha: isDarkMode ? 0.09 : 0.07),
+                  blurRadius: 22,
+                  spreadRadius: -8,
+                ),
+              ],
+            ),
+            child: Row(
+              children: List.generate(destinations.length, (index) {
+                final destination = destinations[index];
+                final selected = _tabIndex == index;
+                return Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: selected,
+                    label: destination.label,
+                    child: Tooltip(
+                      message: destination.label,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => setState(() => _tabIndex = index),
+                          customBorder: const StadiumBorder(),
+                          child: AnimatedContainer(
+                            duration: reduceMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? primary.withValues(alpha: isDarkMode ? 0.24 : 0.13)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(23),
+                              border: selected
+                                  ? Border.all(
+                                      color: primary.withValues(alpha: 0.20),
+                                    )
+                                  : null,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                AnimatedScale(
+                                  scale: selected ? 1.04 : 1,
+                                  duration: reduceMotion
+                                      ? Duration.zero
+                                      : const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutBack,
+                                  child: Icon(
+                                    selected
+                                        ? destination.selectedIcon
+                                        : destination.icon,
+                                    size: 22,
+                                    color: selected ? primary : muted,
+                                  ),
+                                ),
+                                AnimatedSize(
+                                  duration: reduceMotion
+                                      ? Duration.zero
+                                      : const Duration(milliseconds: 180),
+                                  curve: Curves.easeOutCubic,
+                                  child: selected
+                                      ? Padding(
+                                          padding: const EdgeInsets.only(top: 3),
+                                          child: Text(
+                                            destination.label,
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              fontFamily: 'DM Sans',
+                                              fontSize: 9,
+                                              height: 1,
+                                              fontWeight: FontWeight.w700,
+                                              color: foreground,
+                                            ),
+                                          ),
+                                        )
+                                      : const SizedBox(height: 0),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
