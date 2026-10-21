@@ -15,7 +15,7 @@ void main() {
       expect(app_dates.DateUtils.calculateStreak(dates), 2);
     });
 
-    test('counts consecutive calendar days across month boundaries', () {
+    test('counts consecutive calendar days using normalized dates', () {
       final today = DateTime.now();
       final currentDay = DateTime.utc(today.year, today.month, today.day);
       final yesterday = currentDay.subtract(const Duration(days: 1));
