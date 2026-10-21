@@ -22,6 +22,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _hasInput = false;
+  bool _isPreparingSend = false;
+  late Future<void> _historyLoadFuture;
   int _historyGeneration = 0;
 
   @override
@@ -33,7 +35,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         setState(() => _hasInput = hasText);
       }
     });
-    _loadChatHistory();
+    _historyLoadFuture = _loadChatHistory();
   }
 
   Future<void> _loadChatHistory() async {
@@ -94,108 +96,130 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _send() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || ref.read(isLoadingChatProvider)) return;
-
-    final sessionId = ref.read(currentChatIdProvider);
-    final isCrisis = CrisisDetector.detect(text);
-    final analysis = EmotionDetector.analyze(text);
-    final detectedEmotion = analysis['emotion'] as String;
-    final intensity = analysis['intensity'] as double;
-
-    ref.read(currentChatEmotionProvider.notifier).state =
-        detectedEmotion != 'neutral' ? detectedEmotion : '';
-
-    final userMessage = ChatMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      text: text,
-      isFromBud: false,
-      timestamp: DateTime.now(),
-      sessionId: sessionId,
-    );
-
-    // Update state
-    ref.read(chatMessagesProvider.notifier).state = [
-      ...ref.read(chatMessagesProvider),
-      userMessage,
-    ];
-
-    _controller.clear();
-    setState(() => _hasInput = false);
-    _scrollToBottom();
-    // Lock out rapid repeat submissions while the user turn is being saved
-    // and generated. The lock is reset in finally (or dispose).
-    ref.read(isLoadingChatProvider.notifier).state = true;
-
-    // Persist encrypted to SQLite3
-    try {
-      await DatabaseService.saveChatMessage(
-        userMessage,
-        mood: detectedEmotion,
-        intensity: intensity,
-      );
-    } catch (_) {}
-
-    // The screen may have been closed while persistence was in flight.
-    if (!mounted) return;
-
-    // Show crisis popup if triggered
-    if (isCrisis && mounted) {
-      _showCrisisDialog();
-    }
-
-    // Trigger Bud generation
-    _scrollToBottom();
+    if (_isPreparingSend || ref.read(isLoadingChatProvider)) return;
+    _isPreparingSend = true;
 
     try {
-      final responseText = await ref
-          .read(llmServiceProvider)
-          .getEmotionalBudResponse(
-            userMessage: text,
-            userName: ref.read(userNameProvider),
-            personalityMode: ref.read(buddyPersonalityProvider),
-          );
-
+      // Restore persisted context before constructing the next prompt. This
+      // avoids a first message racing the async history read on screen startup.
+      await _historyLoadFuture;
       if (!mounted) return;
 
-      final budMessage = ChatMessage(
+      final text = _controller.text.trim();
+      if (text.isEmpty) return;
+
+      final sessionId = ref.read(currentChatIdProvider);
+      final isCrisis = CrisisDetector.detect(text);
+      final analysis = EmotionDetector.analyze(text);
+      final detectedEmotion = analysis['emotion'] as String;
+      final intensity = analysis['intensity'] as double;
+
+      ref.read(currentChatEmotionProvider.notifier).state =
+          detectedEmotion != 'neutral' ? detectedEmotion : '';
+
+      final userMessage = ChatMessage(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
-        text: responseText,
-        isFromBud: true,
+        text: text,
+        isFromBud: false,
         timestamp: DateTime.now(),
         sessionId: sessionId,
       );
 
       ref.read(chatMessagesProvider.notifier).state = [
         ...ref.read(chatMessagesProvider),
-        budMessage,
+        userMessage,
       ];
 
-      // Persist encrypted Bud message to SQLite3
+      _controller.clear();
+      setState(() => _hasInput = false);
+      _scrollToBottom();
+      // Lock out repeat submissions before any persistence/inference await.
+      ref.read(isLoadingChatProvider.notifier).state = true;
+
       try {
         await DatabaseService.saveChatMessage(
-          budMessage,
+          userMessage,
           mood: detectedEmotion,
+          intensity: intensity,
         );
-      } catch (_) {}
-    } catch (e) {
-      if (!mounted) return;
-      final errorMessage = ChatMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        text: 'I\'m here with you. Take a slow, steady breath. What feels heaviest right now?',
-        isFromBud: true,
-        timestamp: DateTime.now(),
-        sessionId: sessionId,
-      );
-      ref.read(chatMessagesProvider.notifier).state = [
-        ...ref.read(chatMessagesProvider),
-        errorMessage,
-      ];
-    } finally {
-      if (mounted) {
-        ref.read(isLoadingChatProvider.notifier).state = false;
-        _scrollToBottom();
+      } catch (error) {
+        debugPrint('ChatScreen: user message persistence failed: $error');
       }
+
+      if (!mounted) return;
+
+      if (isCrisis) _showCrisisDialog();
+      _scrollToBottom();
+
+      try {
+        // Call the service directly: a FutureProvider.family is cached by
+        // message text and can return a stale answer for repeated messages.
+        final responseText = await ref
+            .read(llmServiceProvider)
+            .getEmotionalBudResponse(
+              userMessage: text,
+              userName: ref.read(userNameProvider),
+              personalityMode: ref.read(buddyPersonalityProvider),
+            );
+
+        if (!mounted) return;
+
+        final budMessage = ChatMessage(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          text: responseText,
+          isFromBud: true,
+          timestamp: DateTime.now(),
+          sessionId: sessionId,
+        );
+
+        ref.read(chatMessagesProvider.notifier).state = [
+          ...ref.read(chatMessagesProvider),
+          budMessage,
+        ];
+
+        try {
+          await DatabaseService.saveChatMessage(
+            budMessage,
+            mood: detectedEmotion,
+          );
+        } catch (error) {
+          debugPrint('ChatScreen: Bud response persistence failed: $error');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Reply shown, but could not be saved to chat history.'),
+              ),
+            );
+          }
+        }
+      } catch (error, stackTrace) {
+        debugPrint('ChatScreen: response generation failed: $error\n$stackTrace');
+        if (!mounted) return;
+
+        final errorMessage = ChatMessage(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          text: 'I\'m here with you. Take a slow, steady breath. What feels heaviest right now?',
+          isFromBud: true,
+          timestamp: DateTime.now(),
+          sessionId: sessionId,
+        );
+        ref.read(chatMessagesProvider.notifier).state = [
+          ...ref.read(chatMessagesProvider),
+          errorMessage,
+        ];
+        try {
+          await DatabaseService.saveChatMessage(errorMessage);
+        } catch (persistError) {
+          debugPrint('ChatScreen: fallback response persistence failed: $persistError');
+        }
+      } finally {
+        if (mounted) {
+          ref.read(isLoadingChatProvider.notifier).state = false;
+          _scrollToBottom();
+        }
+      }
+    } finally {
+      _isPreparingSend = false;
     }
   }
 
