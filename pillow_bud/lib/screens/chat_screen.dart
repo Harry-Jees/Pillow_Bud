@@ -406,6 +406,66 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  Future<void> _showConversationHistory() async {
+    final sessions = await DatabaseService.getChatSessions();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * 0.65,
+          child: Column(
+            children: [
+              ListTile(
+                title: const Text('Your conversations'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.add_comment_outlined),
+                  tooltip: 'New conversation',
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    _historyGeneration++;
+                    ref.read(currentChatIdProvider.notifier).state =
+                        'chat_${DateTime.now().microsecondsSinceEpoch}';
+                    ref.read(chatMessagesProvider.notifier).state = [];
+                    ref.read(llmServiceProvider).clearConversationHistory();
+                    _historyLoadFuture = _loadChatHistory();
+                  },
+                ),
+              ),
+              Expanded(
+                child: sessions.isEmpty
+                    ? const Center(child: Text('Saved conversations will appear here.'))
+                    : ListView.builder(
+                        itemCount: sessions.length,
+                        itemBuilder: (context, index) {
+                          final item = sessions[index];
+                          final id = item['id'] as String;
+                          return ListTile(
+                            leading: const Icon(Icons.chat_bubble_outline_rounded),
+                            title: Text(item['title'] as String? ?? 'Conversation'),
+                            subtitle: Text('${item['message_count']} messages'),
+                            onTap: () {
+                              Navigator.pop(sheetContext);
+                              if (id == ref.read(currentChatIdProvider)) return;
+                              _historyGeneration++;
+                              ref.read(currentChatIdProvider.notifier).state = id;
+                              ref.read(chatMessagesProvider.notifier).state = [];
+                              ref.read(currentChatEmotionProvider.notifier).state = '';
+                              ref.read(llmServiceProvider).clearConversationHistory();
+                              _historyLoadFuture = _loadChatHistory();
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _clearChat() {
     showDialog(
       context: context,
@@ -521,8 +581,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.history_rounded, size: 22),
+            tooltip: 'Conversation history',
+            onPressed: _showConversationHistory,
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_comment_outlined, size: 22),
+            tooltip: 'New conversation',
+            onPressed: () {
+              _historyGeneration++;
+              ref.read(currentChatIdProvider.notifier).state =
+                  'chat_${DateTime.now().microsecondsSinceEpoch}';
+              ref.read(chatMessagesProvider.notifier).state = [];
+              ref.read(currentChatEmotionProvider.notifier).state = '';
+              ref.read(llmServiceProvider).clearConversationHistory();
+              _historyLoadFuture = _loadChatHistory();
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded, size: 22),
-            tooltip: 'Start Fresh',
+            tooltip: 'Clear this conversation',
             onPressed: messages.isNotEmpty ? _clearChat : null,
           ),
         ],
