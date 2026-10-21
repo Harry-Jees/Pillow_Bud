@@ -369,3 +369,12 @@ No workflow reruns were triggered for this implementation pass. Code has been co
 - [x] Added regression tests for malformed table payloads and malformed record entries.
 - [ ] Run the new tests and existing suite in a Flutter-enabled environment; remote edits alone do not prove compilation or test success.
 - [ ] Transactional restore and full rollback semantics remain future work; per-row database conflicts can still produce a reported partial restore.
+
+
+### Phase 2 follow-up — legacy encrypted-field migration
+
+- Added migration-on-read for legacy chat and journal ciphertext that uses IV-only metadata: records are decrypted with the existing compatibility path, then rewritten with the authenticated IV-plus-HMAC format.
+- Legacy plaintext mood metadata in chat, journal, and mood-log rows is encrypted when read and saved back to SQLite. Legacy mood-log notes are also upgraded from IV-only to authenticated records.
+- Authenticated records continue to be verified by the encryption service before being returned. Records missing required IV metadata fail closed instead of being guessed as plaintext, except the explicitly identified legacy mood-label columns.
+- Added encryption regression coverage for IV-only legacy compatibility and authentication-tag tampering.
+- Remaining verification: run dart format, flutter analyze, and flutter test in a Flutter-enabled environment; review migration behavior against representative v1/v2 database fixtures before release.
