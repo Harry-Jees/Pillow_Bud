@@ -48,8 +48,7 @@ class InsightsScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
           'Your Insights',
@@ -194,10 +193,21 @@ class InsightsScreen extends ConsumerWidget {
                               child: FractionallySizedBox(
                                 alignment: Alignment.centerLeft,
                                 widthFactor: score,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: primary,
-                                    borderRadius: BorderRadius.circular(6),
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0.0, end: score),
+                                  duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+                                      ? Duration.zero
+                                      : const Duration(milliseconds: 650),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (context, animatedScore, _) => FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: animatedScore,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: primary,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
