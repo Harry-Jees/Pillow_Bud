@@ -87,7 +87,7 @@ class LLMService {
       response = await engine.generate(formattedPrompt);
     } on UnsupportedError {
       return '⚠️ On-device AI is not supported on this platform.';
-    } on Exception catch (error, stackTrace) {
+    } catch (error, stackTrace) {
       // Keep native/runtime details in diagnostic logs only. Calling
       // getInstance() again here could initialize a second engine just to
       // dispose it, so leave engine lifecycle management to its owner.
