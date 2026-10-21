@@ -400,12 +400,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
       if (result == null || result.files.single.path == null) return;
       final file = File(result.files.single.path!);
-      final importResult = await BackupService.importData(file);
+      final passphrase = await _requestBackupPassphrase(
+        title: 'Unlock backup',
+        description: 'Enter the passphrase used when this backup was created.',
+        confirm: false,
+      );
+      if (passphrase == null || !mounted) return;
+      final importResult = await BackupService.importData(
+        file,
+        passphrase: passphrase,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Restored ${importResult.chats} chats, ${importResult.journals} journals, ${importResult.moods} mood logs.',
+              'Restored ${importResult.chats} messages, ${importResult.journals} journal entries, and ${importResult.moods} mood check-ins.',
             ),
           ),
         );
