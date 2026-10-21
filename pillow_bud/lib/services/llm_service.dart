@@ -187,14 +187,25 @@ class LLMService {
     sb.writeln(systemPrompt);
     sb.writeln('<|im_end|>');
 
-    // Include up to 4 recent context turns in ChatML format
-    final historyToInclude = conversationHistory.length > 8
-        ? conversationHistory.sublist(conversationHistory.length - 8)
+    // Keep context bounded so long conversations cannot crowd the current
+    // user message out of the model's 2048-token context window.
+    final historyToInclude = conversationHistory.length > 6
+        ? conversationHistory.sublist(conversationHistory.length - 6)
         : conversationHistory;
+    var historyCharacters = 0;
+    const maxHistoryCharacters = 3000;
 
     for (final turn in historyToInclude) {
       final role = turn['role'] ?? 'user';
-      final content = turn['content'] ?? '';
+      final originalContent = turn['content'] ?? '';
+      if (role != 'user' && role != 'assistant') continue;
+      final remaining = maxHistoryCharacters - historyCharacters;
+      if (remaining <= 0) break;
+      final limit = remaining < 700 ? remaining : 700;
+      final content = originalContent.length > limit
+          ? '${originalContent.substring(0, limit)}…'
+          : originalContent;
+      historyCharacters += content.length;
       sb.writeln('<|im_start|>$role');
       sb.writeln(content);
       sb.writeln('<|im_end|>');
