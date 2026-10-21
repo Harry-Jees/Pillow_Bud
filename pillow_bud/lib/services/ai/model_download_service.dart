@@ -136,31 +136,48 @@ class ModelDownloadService {
       final isPartial = statusCode == 206;
       final contentRange = response.headers.value('content-range');
       var expectedTotalBytes = 0;
+      int? expectedResponseBytes;
 
       if (isPartial) {
-        final prefix = 'bytes $existingLength-';
+        // Validate the complete range before appending any bytes.
+        final match = contentRange == null
+            ? null
+            : RegExp(r'^bytes (\d+)-(\d+)/(\d+)$').firstMatch(contentRange);
+        final start = int.tryParse(match?.group(1) ?? '');
+        final end = int.tryParse(match?.group(2) ?? '');
+        final total = int.tryParse(match?.group(3) ?? '');
         if (existingLength == 0 ||
-            contentRange == null ||
-            !contentRange.startsWith(prefix) ||
-            !contentRange.contains('/')) {
+            start != existingLength ||
+            end == null ||
+            total == null ||
+            start == null ||
+            end < start ||
+            total <= end) {
           throw StateError(
             'The server returned an invalid byte range; download cannot be resumed safely.',
           );
         }
-        final totalPart = contentRange.substring(contentRange.lastIndexOf('/') + 1);
-        expectedTotalBytes = int.tryParse(totalPart) ?? 0;
+        expectedTotalBytes = total;
+        expectedResponseBytes = end - start + 1;
       } else {
         // Some servers ignore Range. In that case restart the temporary file.
         existingLength = 0;
         final lengthHeader = response.headers.value('content-length');
         expectedTotalBytes = int.tryParse(lengthHeader ?? '') ?? 0;
+        expectedResponseBytes =
+            expectedTotalBytes > 0 ? expectedTotalBytes : null;
       }
 
       final contentLengthHeader = response.headers.value('content-length');
-      final responseBytes = int.tryParse(contentLengthHeader ?? '') ?? 0;
+      final responseBytes = int.tryParse(contentLengthHeader ?? '');
+      if (expectedResponseBytes != null &&
+          responseBytes != null &&
+          responseBytes != expectedResponseBytes) {
+        throw StateError('The server response length does not match its byte range.');
+      }
       final totalBytes = expectedTotalBytes > 0
           ? expectedTotalBytes
-          : existingLength + responseBytes;
+          : existingLength + (responseBytes ?? 0);
 
       sink = tempFile.openWrite(
         mode: isPartial ? FileMode.append : FileMode.write,
@@ -197,6 +214,13 @@ class ModelDownloadService {
       await sink.flush();
       await sink.close();
       sink = null;
+
+      if (expectedResponseBytes != null && receivedNow != expectedResponseBytes) {
+        throw StateError(
+          'The model server sent $receivedNow bytes; '
+          'expected $expectedResponseBytes bytes for this response.',
+        );
+      }
 
       final downloadedBytes = await tempFile.length();
       if (downloadedBytes < minimumValidModelBytes ||
