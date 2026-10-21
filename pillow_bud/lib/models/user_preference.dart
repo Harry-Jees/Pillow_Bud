@@ -22,8 +22,8 @@ class UserPreference {
       userName: '',
       buddyPersonality: 'balanced',
       isDarkMode: true,
-      primaryColor: '#C4A8F8',
-      secondaryColor: '#89C4F8',
+      primaryColor: '#8B78D6',
+      secondaryColor: '#76B8E8',
       onboardingCompleted: false,
     );
   }
