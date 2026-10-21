@@ -62,24 +62,24 @@ You deserve compassionate, professional support. Please reach out to them now. ð
   static List<Map<String, String>> getResources() {
     return [
       {
-        'name': 'iCall Psychosocial Helpline',
-        'number': '9152987821',
-        'desc': 'Mon-Sat, 8am-10pm â€¢ Professional support',
+        'name': 'Tele-MANAS (National Mental Health Helpline)',
+        'number': '14416',
+        'desc': 'Free, 24/7 mental health support across India',
       },
       {
         'name': 'Vandrevala Foundation',
-        'number': '+91 9999 666 555',
+        'number': '9999666555',
         'desc': '24/7 Mental Health Helpline',
       },
       {
         'name': 'AASRA Helpline',
-        'number': '9820466726',
+        'number': '9820466728',
         'desc': '24/7 Suicide Prevention & Crisis Intervention',
       },
       {
-        'name': 'Tele-MANAS',
-        'number': '14416',
-        'desc': '24/7 National Toll-Free Mental Health Service',
+        'name': 'Emergency services (India)',
+        'number': '112',
+        'desc': 'Call if you or someone else is in immediate danger',
       },
     ];
   }
