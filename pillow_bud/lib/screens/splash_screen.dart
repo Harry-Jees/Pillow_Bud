@@ -76,17 +76,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _startSplash() async {
-    final reduceMotion =
-        MediaQueryData.fromView(View.of(context)).disableAnimations;
-    if (reduceMotion) {
-      _logoController.value = 1;
-      if (mounted) setState(() => _visible = true);
-    } else {
-      // Start after the first frame so the icon is visibly above the screen.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _logoController.forward();
-      });
-    }
+    // Read accessibility settings after the first frame, when inherited
+    // media information is available.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final media = MediaQuery.maybeOf(context);
+      final reduceMotion = media?.disableAnimations == true ||
+          WidgetsBinding.instance.platformDispatcher.accessibilityFeatures
+              .reduceMotion;
+      if (reduceMotion) {
+        _logoController.value = 1;
+      } else {
+        _logoController.forward();
+      }
+    });
 
     await Future.delayed(const Duration(milliseconds: 1450));
     if (!mounted) return;
