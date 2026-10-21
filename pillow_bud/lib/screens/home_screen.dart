@@ -303,7 +303,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: GestureDetector(
                         onTap: () => _onMoodSelected(m['emoji']!),
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+                              ? Duration.zero
+                              : const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           margin: const EdgeInsets.symmetric(horizontal: 4),
                           decoration: BoxDecoration(
