@@ -400,17 +400,26 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ..._smallSteps.map(
-                    (step) => RadioListTile<String>(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      value: step,
-                      groupValue: _selectedSmallStep,
-                      activeColor: primary,
-                      title: Text(step, style: Theme.of(context).textTheme.bodyMedium),
-                      onChanged: (value) => setState(() {
-                        _selectedSmallStep = value ?? '';
-                      }),
+                  RadioGroup<String>(
+                    groupValue: _selectedSmallStep,
+                    onChanged: (value) => setState(() {
+                      _selectedSmallStep = value ?? '';
+                    }),
+                    child: Column(
+                      children: _smallSteps
+                          .map(
+                            (step) => RadioListTile<String>(
+                              contentPadding: EdgeInsets.zero,
+                              dense: true,
+                              value: step,
+                              activeColor: primary,
+                              title: Text(
+                                step,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ),
                   if (_selectedSmallStep.isNotEmpty) ...[
@@ -432,15 +441,14 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
                     const SizedBox(height: 8),
                     OutlinedButton.icon(
                       onPressed: () async {
-                        final updated = [..._copingPlan, _selectedSmallStep].toSet().toList();
+                        final updated = {..._copingPlan, _selectedSmallStep}.toList();
                         try {
                           await StorageService.saveCopingPlan(updated);
-                          if (mounted) {
-                            setState(() => _copingPlan = updated);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Added to your personal coping plan.')),
-                            );
-                          }
+                          if (!context.mounted) return;
+                          setState(() => _copingPlan = updated);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Added to your personal coping plan.')),
+                          );
                         } catch (error) {
                           debugPrint('CalmMomentSheet: coping plan save failed: $error');
                         }
