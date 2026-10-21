@@ -55,8 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         if (isDesktop) {
           return Scaffold(
-            backgroundColor:
-                isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+            backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
             body: Row(
               children: [
                 NavigationRail(
@@ -111,7 +110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 800),
-                      child: screens[_tabIndex],
+                      child: _buildScreenTransition(screens[_tabIndex]),
                     ),
                   ),
                 ),
@@ -121,9 +120,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
 
         return Scaffold(
-          backgroundColor:
-              isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
-          body: screens[_tabIndex],
+          backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
+          body: _buildScreenTransition(screens[_tabIndex]),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tabIndex,
             onDestinationSelected: (i) => setState(() => _tabIndex = i),
@@ -157,6 +155,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildScreenTransition(Widget screen) {
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return AnimatedSwitcher(
+      duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 280),
+      reverseDuration:
+          reduceMotion ? Duration.zero : const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final offset = reduceMotion ? Offset.zero : const Offset(0.025, 0);
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: offset, end: Offset.zero)
+                .animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey<int>(_tabIndex),
+        child: screen,
+      ),
     );
   }
 
@@ -272,7 +296,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: _moods.map((m) {
                     final isSelected = currentMood == m['emoji'];
                     return Expanded(
-                      child: GestureDetector(
+                      child: Semantics(
+                        button: true,
+                        selected: isSelected,
+                        label: '${m['label']} mood',
+                        child: GestureDetector(
                         onTap: () => _onMoodSelected(m['emoji']!),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -317,6 +345,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       ),
+                    ),
                     );
                   }).toList(),
                 ),
