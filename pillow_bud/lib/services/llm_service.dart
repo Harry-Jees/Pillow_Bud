@@ -74,7 +74,6 @@ class LLMService {
       personalityMode: personalityMode,
       detectedEmotion: detectedEmotion,
       emotionIntensity: emotionIntensity,
-      recentContext: _getRecentContext(),
     );
 
     // 5. Build Qwen ChatML Formatted Prompt
@@ -220,16 +219,5 @@ class LLMService {
       text = text.substring(10);
     }
     return text.trim();
-  }
-
-  String _getRecentContext() {
-    if (conversationHistory.isEmpty) return 'No recent conversation.';
-    final recent = conversationHistory.length > 6
-        ? conversationHistory.sublist(conversationHistory.length - 6)
-        : conversationHistory;
-    return recent.map((m) {
-      final role = m['role'] == 'user' ? 'User' : 'Bud';
-      return '$role: ${m['content']}';
-    }).join('\n');
   }
 }
