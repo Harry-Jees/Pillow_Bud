@@ -41,14 +41,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _loadChatHistory() async {
     final generation = _historyGeneration;
     final sessionId = ref.read(currentChatIdProvider);
+
+    // The splash screen may have preloaded messages from more than one chat.
+    // Keep the active screen and model context isolated to this session.
+    final sessionMessages = ref
+        .read(chatMessagesProvider)
+        .where((message) => message.sessionId == sessionId)
+        .toList();
+    ref.read(chatMessagesProvider.notifier).state = sessionMessages;
+
     try {
       final history = await DatabaseService.getAllChatMessages(
         sessionId: sessionId,
       );
       if (!mounted || generation != _historyGeneration) return;
-      // Merge with messages sent while the database read was in flight.
-      // IDs prevent duplicate bubbles; timestamps preserve conversation order.
-      final currentMessages = ref.read(chatMessagesProvider);
+      // Merge only this session's messages sent while the database read was
+      // in flight. IDs prevent duplicates; timestamps preserve conversation order.
+      final currentMessages = ref
+          .read(chatMessagesProvider)
+          .where((message) => message.sessionId == sessionId);
       final mergedById = <String, ChatMessage>{
         for (final message in history) message.id: message,
         for (final message in currentMessages) message.id: message,
