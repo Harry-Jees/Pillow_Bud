@@ -72,7 +72,10 @@ class LLMService {
     response = _cleanModelOutput(response);
 
     if (response.isEmpty) {
-      return 'I\'m here with you. Take a slow, steady breath. What feels heaviest right now?';
+      return 'I couldn\'t generate a response from the on-device model this time. '
+          'Your message is still here—please try again. If this keeps happening, '
+          'check that the downloaded model is complete and that your device has '
+          'enough available memory.';
     }
 
     // 7. Store conversation turn for continuous contextual memory
