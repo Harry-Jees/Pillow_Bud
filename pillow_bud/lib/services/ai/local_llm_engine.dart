@@ -81,8 +81,8 @@ class LocalLLMEngine {
       final stream = llama.answer(
         prompt,
         temperature: 0.7,
-        topK: 40,
-        topP: 0.9,
+        topK: 20,
+        topP: 0.8,
         penalizeNewline: false,
       );
       await for (final token in stream) {
@@ -109,8 +109,8 @@ class LocalLLMEngine {
       final stream = llama.answer(
         prompt,
         temperature: 0.7,
-        topK: 40,
-        topP: 0.9,
+        topK: 20,
+        topP: 0.8,
         penalizeNewline: false,
       );
       await for (final token in stream) {
