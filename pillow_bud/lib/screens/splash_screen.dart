@@ -51,8 +51,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       userName: userName,
       buddyPersonality: buddyPersonality,
       isDarkMode: isDarkMode,
-      primaryColor: '#C4A8F8',
-      secondaryColor: '#89C4F8',
+      primaryColor: '#8B78D6',
+      secondaryColor: '#76B8E8',
       onboardingCompleted: completed,
       onboardingCompletedAt: memberSince,
     );
@@ -102,10 +102,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final isDarkMode = ref.watch(isDarkModeProvider);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       body: Center(
         child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 600),
+          duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+              ? Duration.zero
+              : const Duration(milliseconds: 600),
           opacity: _visible ? 1 : 0,
           curve: Curves.easeOutCubic,
           child: Column(
