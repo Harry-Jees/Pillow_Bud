@@ -28,32 +28,44 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     {'emoji': '😄', 'label': 'Joyful'},
   ];
 
+  static const List<String> _reflectionPrompts = [
+    'What has felt heavier than usual today?',
+    'What is one thing I wish someone understood about me?',
+    'When did I feel even a little more like myself?',
+    'What do I need more of, and what do I need less of?',
+    'What would I say to a friend who felt the way I do?',
+    'What is one small thing I handled today?',
+  ];
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
-  Future<void> _saveEntry() async {
+  Future<void> _saveEntry({JournalEntry? editingEntry}) async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    final entryId = DateTime.now().microsecondsSinceEpoch.toString();
     final now = DateTime.now();
-
     final entry = JournalEntry(
-      id: entryId,
+      id: editingEntry?.id ?? now.microsecondsSinceEpoch.toString(),
       text: text,
       mood: _selectedMood,
-      dateCreated: now,
+      dateCreated: editingEntry?.dateCreated ?? now,
       dateModified: now,
     );
 
-    final updated = [entry, ...ref.read(journalEntriesProvider)];
+    final updated = [
+      entry,
+      ...ref
+          .read(journalEntriesProvider)
+          .where((existing) => existing.id != entry.id),
+    ];
     ref.read(journalEntriesProvider.notifier).state = updated;
     await StorageService.saveJournalEntries(updated);
 
-    // Save encrypted to SQLite3
+    // Save encrypted to SQLite3.
     try {
       await DatabaseService.saveJournalEntry(entry);
     } catch (_) {}
@@ -172,6 +184,14 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                     tooltip: 'Delete Entry',
                     onPressed: () => _deleteEntry(entry),
                   ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showNewEntryDialog(editingEntry: entry);
+                    },
+                    icon: const Icon(Icons.edit_outlined, size: 17),
+                    label: const Text('Edit'),
+                  ),
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
@@ -192,7 +212,9 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     );
   }
 
-  void _showNewEntryDialog() {
+  void _showNewEntryDialog({JournalEntry? editingEntry}) {
+    _controller.text = editingEntry?.text ?? '';
+    _selectedMood = editingEntry?.mood ?? '😌';
     final isDarkMode = ref.read(isDarkModeProvider);
     final themeColors = ref.read(currentThemeProvider);
     final primary = themeColors['primary'] ?? AppColors.primary;
@@ -214,7 +236,9 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'New Journal Reflection',
+                      editingEntry == null
+                          ? 'New Journal Reflection'
+                          : 'Edit Reflection',
                       style: TextStyle(
                         fontFamily: 'Lora',
                         fontSize: 20,
@@ -224,7 +248,23 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                             : const Color(0xFF1A1225),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final prompt = _reflectionPrompts[
+                              DateTime.now().day % _reflectionPrompts.length];
+                          _controller.text = prompt;
+                          _controller.selection = TextSelection.collapsed(
+                            offset: prompt.length,
+                          );
+                        },
+                        icon: const Icon(Icons.lightbulb_outline_rounded, size: 17),
+                        label: const Text('Give me a gentle prompt'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: _controller,
                       maxLines: 6,
@@ -314,7 +354,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
-                          onPressed: _saveEntry,
+                          onPressed: () => _saveEntry(editingEntry: editingEntry),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primary,
                             foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -322,7 +362,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: const Text('Save Reflection'),
+                          child: Text(editingEntry == null ? 'Save Reflection' : 'Save Changes'),
                         ),
                       ],
                     ),
