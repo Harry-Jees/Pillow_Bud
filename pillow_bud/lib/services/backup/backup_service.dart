@@ -10,11 +10,11 @@ import 'package:pillow_bud/services/encryption/encryption_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pillow_bud/services/database/database_service.dart';
 
-/// Exports encrypted database rows with visible metadata; the archive itself is not encrypted.
+/// Creates portable, passphrase-protected backups of encrypted database rows.
 ///
-/// Export format: `PBv2:<base64(JSON)>`. This is encoding, not file encryption.
-/// The JSON payload contains raw encrypted SQLite rows (ciphertext + iv pairs)
-/// so messages are never decrypted during export – they travel as already-encrypted blobs.
+/// PBv3 encrypts the complete archive, including metadata, with a key derived
+/// from the user's passphrase and authenticates it before decryption. PBv2 is
+/// accepted for same-installation backward compatibility only.
 class BackupService {
   static const _magic = 'PBv3:';
   static const _legacyMagic = 'PBv2:';
@@ -24,9 +24,9 @@ class BackupService {
   //  EXPORT
   // ──────────────────────────────────────────────────────────
 
-  /// Exports a `.pillowbak` file to the device cache directory. The file is not encrypted.
+  /// Exports an encrypted `.pillowbak` file to the device cache directory.
   ///
-  /// Returns the [File] so the caller can share / save it.
+  /// Returns the [File] so the caller can share or save it.
   static Future<File> exportData({required String passphrase}) async {
     if (passphrase.trim().length < 10) {
       throw ArgumentError('Use a backup passphrase with at least 10 characters.');
@@ -116,7 +116,7 @@ class BackupService {
   //  IMPORT
   // ──────────────────────────────────────────────────────────
 
-  /// Imports a same-installation `.pillowbak` file and restores rows into SQLite.
+  /// Imports a passphrase-protected portable backup or a legacy PBv2 backup.
   ///
   /// Throws [FormatException] for invalid files.
   /// Returns an [ImportResult] with per-table counts.
