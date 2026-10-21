@@ -256,9 +256,12 @@ class ModelDownloadService {
       }
 
       if (!await hasGgufMagic(tempFile)) {
+        // This is a completed but invalid payload, not a resumable partial.
+        // Remove it so the next attempt starts with a clean download.
+        await tempFile.delete();
         throw StateError(
           'The downloaded file is not a valid GGUF container. '
-          'The partial file was kept for inspection or retry.',
+          'The invalid file was removed; please download the model again.',
         );
       }
 
