@@ -142,7 +142,6 @@ class LLMService {
       personalityMode: personalityMode,
       detectedEmotion: detectedEmotion,
       emotionIntensity: emotionIntensity,
-      recentContext: _getRecentContext(),
     );
 
     final formattedPrompt = _buildChatMLPrompt(systemPrompt, userMessage);
