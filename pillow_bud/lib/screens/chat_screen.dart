@@ -545,7 +545,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Share anything on your mind. All conversations are encrypted and processed 100% locally on your device.',
+              'Share anything on your mind. Your conversation stays on this device.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'DM Sans',
@@ -555,6 +555,54 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     : AppColors.textSecondaryLight,
                 height: 1.5,
               ),
+            ),
+            const SizedBox(height: 22),
+            Text(
+              'If finding the words is hard, start here',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'DM Sans',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDarkMode
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                'I need to get something off my chest.',
+                'Help me calm down for a moment.',
+                'I am feeling alone.',
+                'Help me untangle my thoughts.',
+              ].map((prompt) {
+                return ActionChip(
+                  label: Text(prompt),
+                  onPressed: () {
+                    _controller.text = prompt;
+                    _controller.selection = TextSelection.collapsed(
+                      offset: prompt.length,
+                    );
+                    setState(() => _hasInput = true);
+                    _send();
+                  },
+                  backgroundColor: primary.withValues(alpha: 0.09),
+                  side: BorderSide(
+                    color: primary.withValues(alpha: 0.22),
+                  ),
+                  labelStyle: TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 12,
+                    color: isDarkMode
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                );
+              }).toList(),
             ),
           ],
         ),
