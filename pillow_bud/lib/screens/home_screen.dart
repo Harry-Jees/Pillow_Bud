@@ -32,11 +32,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     {'emoji': '😟', 'label': 'Anxious'},
   ];
 
-  void _onMoodSelected(String emoji) async {
+  Future<void> _onMoodSelected(String emoji) async {
     ref.read(currentMoodProvider.notifier).state = emoji;
+    final noteController = TextEditingController();
+    String? note;
     try {
-      await DatabaseService.logMood(emoji);
-    } catch (_) {}
+      note = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('A little more about this moment?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('You chose $emoji. Add a private note if it would help; this is optional.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                minLines: 2,
+                maxLines: 4,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  hintText: 'What might be affecting how you feel?',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, ''),
+              child: const Text('Just check in'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, noteController.text),
+              child: const Text('Save check-in'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      noteController.dispose();
+    }
+    if (!mounted || note == null) return;
+    try {
+      final trimmedNote = note.trim();
+      await DatabaseService.logMood(
+        emoji,
+        note: trimmedNote.isEmpty ? null : trimmedNote,
+      );
+    } catch (error) {
+      debugPrint('HomeScreen: mood check-in could not be saved: $error');
+    }
     ref.invalidate(moodHistoryProvider);
   }
 
