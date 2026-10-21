@@ -28,10 +28,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     _controller.addListener(() {
       final hasText = _controller.text.trim().isNotEmpty;
-      if (hasText != _hasInput) {
+      if (hasText != _hasInput && mounted) {
         setState(() => _hasInput = hasText);
       }
     });
+    _loadChatHistory();
+  }
+
+  Future<void> _loadChatHistory() async {
+    final sessionId = ref.read(currentChatIdProvider);
+    try {
+      final history = await DatabaseService.getAllChatMessages(
+        sessionId: sessionId,
+      );
+      if (!mounted) return;
+      // Do not overwrite messages if the user has already started chatting
+      // while the database read was in flight.
+      if (ref.read(chatMessagesProvider).isEmpty) {
+        ref.read(chatMessagesProvider.notifier).state = history;
+        if (history.isNotEmpty) _scrollToBottom();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chat history could not be loaded from this device.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -252,11 +276,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogContext);
+              final sessionId = ref.read(currentChatIdProvider);
               ref.read(chatMessagesProvider.notifier).state = [];
               ref.read(currentChatEmotionProvider.notifier).state = '';
-              DatabaseService.clearAllChatMessages();
+              try {
+                await DatabaseService.clearAllChatMessages(
+                  sessionId: sessionId,
+                );
+              } catch (_) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Could not clear the saved chat history.'),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.danger,
