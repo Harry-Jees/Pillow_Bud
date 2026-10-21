@@ -335,3 +335,29 @@ For each comparison, record: platform availability, offline boundaries, privacy/
 - Do not remove legacy data paths until migration and rollback behavior are tested.
 - Do not run unnecessary workflow reruns. Prefer reading existing statuses and running checks locally or through a deliberate CI change.
 - Do not merge unfinished work into `main` merely to keep momentum.
+
+
+---
+
+## Build progress — 2026-10-21
+
+Implementation has started on `MASTER-UPDATES`. This section records completed code changes separately from the larger roadmap.
+
+### Completed in the first implementation pass
+
+- [x] Model acceptance now checks the four-byte `GGUF` container signature as well as the existing minimum-size check.
+- [x] Startup validation rejects and removes a final-path file that is truncated or does not have the GGUF signature.
+- [x] Completed downloads are checked for the GGUF signature before being promoted to the final model path. Invalid completed payloads are removed so a retry does not resume from bad bytes.
+- [x] Added unit tests for valid GGUF magic, short files, and unrelated/HTML-like payloads.
+- [x] Backup restore now counts skipped chat, journal, and mood records; the UI tells the user when restoration was partial instead of reporting only successful rows.
+
+### Still outstanding / not claimed complete
+
+- [ ] Run `dart format`, `flutter analyze`, and `flutter test` in a Flutter-enabled environment.
+- [ ] Add full model identity/checksum verification; GGUF magic is a container check, not proof that the file is the expected Qwen model.
+- [ ] Make backup imports transactional or otherwise guarantee a clearly defined partial-failure/recovery contract.
+- [ ] Audit and migrate unauthenticated legacy encrypted records without risking existing user data.
+- [ ] Complete screen/asset inventory before broad UI redesign.
+- [ ] Test native builds and download edge cases on supported platforms.
+
+No workflow reruns were triggered for this implementation pass. Code has been committed to this branch only; `main` remains unchanged until validation and review.
