@@ -25,6 +25,12 @@ class CrisisDetector {
     'end it all',
     'no reason to live',
     'tired of living',
+    'i cannot keep myself safe',
+    "i can't keep myself safe",
+    'i have a plan to end my life',
+    'i might not be here tomorrow',
+    'i do not trust myself to stay safe',
+    "i don't trust myself to stay safe",
   ];
 
   /// Backwards-compatible entrypoint
@@ -32,7 +38,27 @@ class CrisisDetector {
 
   /// Detects if the message contains crisis-related keywords
   static bool detect(String message) {
-    final lower = message.toLowerCase().replaceAll('’', "'");
+    final lower = message
+        .toLowerCase()
+        .replaceAll('’', "'")
+        .replaceAll(RegExp(r'\\s+'), ' ')
+        .trim();
+
+    // Avoid raising the emergency overlay for a standalone, explicit denial.
+    // Any additional risk language in a longer message is still evaluated.
+    const explicitDenials = [
+      "i am not suicidal",
+      "i'm not suicidal",
+      "im not suicidal",
+      "i don't want to hurt myself",
+      "i do not want to hurt myself",
+      "i don't want to kill myself",
+      "i do not want to kill myself",
+      "i am not going to hurt myself",
+      "i'm not going to hurt myself",
+    ];
+    if (explicitDenials.contains(lower)) return false;
+
     final allTriggers = <String>{...Constants.crisisTriggers, ..._crisisTriggers};
     for (final trigger in allTriggers) {
       final phrase = trigger.toLowerCase();
