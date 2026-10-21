@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:pillow_bud/models/chat_message.dart';
 import 'package:pillow_bud/providers/app_state_provider.dart';
 import 'package:pillow_bud/providers/llm_provider.dart';
@@ -276,6 +277,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  Future<void> _callCrisisResource(String number) async {
+    final dialableNumber = number.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri(scheme: 'tel', path: dialableNumber);
+    try {
+      final opened = await launchUrl(uri);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the phone dialer on this device.')),
+        );
+      }
+    } catch (error) {
+      debugPrint('ChatScreen: could not open crisis helpline dialer: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the phone dialer on this device.')),
+        );
+      }
+    }
+  }
+
   void _showCrisisDialog() {
     showDialog(
       context: context,
@@ -323,7 +344,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Column(
@@ -331,12 +351,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         children: [
                           Text(
                             resource['name']!,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontFamily: 'DM Sans',
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
+                          const SizedBox(height: 3),
                           Text(
                             resource['number']!,
                             style: TextStyle(
@@ -346,10 +367,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if ((resource['desc'] ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              resource['desc']!,
+                              style: TextStyle(
+                                fontFamily: 'DM Sans',
+                                fontSize: 10,
+                                color: Colors.white.withValues(alpha: 0.62),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                    Icon(Icons.call, color: Theme.of(dialogContext).colorScheme.primary, size: 20),
+                    IconButton(
+                      tooltip: 'Call ${resource['name']}',
+                      onPressed: () => _callCrisisResource(resource['number']!),
+                      icon: Icon(
+                        Icons.call_rounded,
+                        color: Theme.of(dialogContext).colorScheme.primary,
+                        size: 20,
+                      ),
+                    ),
                   ],
                 ),
               );
