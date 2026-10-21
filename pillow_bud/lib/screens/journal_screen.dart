@@ -89,8 +89,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor:
-            isDarkMode ? const Color(0xFF2F2F2F) : Colors.white,
+        backgroundColor: isDarkMode ? AppColors.cardBackground : AppColors.lightSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -352,8 +351,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
             .toList();
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
           'My Journal',
@@ -445,7 +443,18 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                       itemCount: filteredEntries.length,
                       itemBuilder: (context, index) {
                         final entry = filteredEntries[index];
-                        return GestureDetector(
+                        return TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.97, end: 1.0),
+                          duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+                              ? Duration.zero
+                              : Duration(milliseconds: 180 + (index.clamp(0, 6) * 25)),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, scale, child) => Transform.scale(
+                            scale: scale,
+                            alignment: Alignment.topCenter,
+                            child: child,
+                          ),
+                          child: GestureDetector(
                           onTap: () => _showEntryDialog(entry),
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -500,6 +509,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                                 ),
                               ],
                             ),
+                          ),
                           ),
                         );
                       },
