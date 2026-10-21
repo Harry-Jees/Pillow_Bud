@@ -46,6 +46,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       // while the database read was in flight.
       if (ref.read(chatMessagesProvider).isEmpty) {
         ref.read(chatMessagesProvider.notifier).state = history;
+        ref.read(llmServiceProvider).restoreConversationHistory(
+          history.map((message) => {
+            'role': message.isFromBud ? 'assistant' : 'user',
+            'content': message.text,
+          }),
+        );
         if (history.isNotEmpty) _scrollToBottom();
       }
     } catch (_) {
@@ -281,6 +287,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               final sessionId = ref.read(currentChatIdProvider);
               ref.read(chatMessagesProvider.notifier).state = [];
               ref.read(currentChatEmotionProvider.notifier).state = '';
+              ref.read(llmServiceProvider).clearConversationHistory();
               try {
                 await DatabaseService.clearAllChatMessages(
                   sessionId: sessionId,
