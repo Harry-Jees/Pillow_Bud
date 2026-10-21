@@ -375,8 +375,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final primary = themeColors['primary'] ?? AppColors.primary;
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF212121) : const Color(0xFFF9F7FD),
+      backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -514,7 +513,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final isUser = !msg.isFromBud;
 
     if (isUser) {
-      return Padding(
+      return TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - value) * 8),
+            child: child,
+          ),
+        ),
+        child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -553,6 +565,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
           ],
+        ),
         ),
       );
     }
