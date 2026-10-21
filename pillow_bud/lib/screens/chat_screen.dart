@@ -163,34 +163,76 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _scrollToBottom();
 
       try {
-        // Call the service directly: a FutureProvider.family is cached by
-        // message text and can return a stale answer for repeated messages.
-        final responseText = await ref
-            .read(llmServiceProvider)
-            .getEmotionalBudResponse(
-              userMessage: text,
-              userName: ref.read(userNameProvider),
-              personalityMode: ref.read(buddyPersonalityProvider),
-            );
+        // Stream tokens directly into one message so Bud visibly types
+        // instead of waiting for the complete model response.
+        final llm = ref.read(llmServiceProvider);
+        final budMessageId = DateTime.now().microsecondsSinceEpoch.toString();
+        var responseText = '';
+        var hasShownMessage = false;
+
+        await for (final token in llm.streamEmotionalBudResponse(
+          userMessage: text,
+          userName: ref.read(userNameProvider),
+          personalityMode: ref.read(buddyPersonalityProvider),
+        )) {
+          if (!mounted) return;
+          responseText += token;
+          final liveMessage = ChatMessage(
+            id: budMessageId,
+            text: responseText,
+            isFromBud: true,
+            timestamp: DateTime.now(),
+            sessionId: sessionId,
+          );
+          final currentMessages = ref.read(chatMessagesProvider);
+          if (!hasShownMessage) {
+            hasShownMessage = true;
+            ref.read(chatMessagesProvider.notifier).state = [
+              ...currentMessages,
+              liveMessage,
+            ];
+          } else {
+            ref.read(chatMessagesProvider.notifier).state = [
+              for (final message in currentMessages)
+                if (message.id == budMessageId) liveMessage else message,
+            ];
+          }
+          _scrollToBottom();
+        }
 
         if (!mounted) return;
+        // Streaming may yield no tokens on a disposed/empty engine. Keep the
+        // chat recoverable and avoid saving an empty assistant message.
+        if (responseText.trim().isEmpty) {
+          responseText = 'I couldn\'t generate a reply this time. Please try again.';
+          final fallbackMessage = ChatMessage(
+            id: budMessageId,
+            text: responseText,
+            isFromBud: true,
+            timestamp: DateTime.now(),
+            sessionId: sessionId,
+          );
+          ref.read(chatMessagesProvider.notifier).state = [
+            ...ref.read(chatMessagesProvider),
+            fallbackMessage,
+          ];
+        }
 
-        final budMessage = ChatMessage(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          text: responseText,
+        final savedMessage = ChatMessage(
+          id: budMessageId,
+          text: responseText.trim(),
           isFromBud: true,
           timestamp: DateTime.now(),
           sessionId: sessionId,
         );
-
         ref.read(chatMessagesProvider.notifier).state = [
-          ...ref.read(chatMessagesProvider),
-          budMessage,
+          for (final message in ref.read(chatMessagesProvider))
+            if (message.id == budMessageId) savedMessage else message,
         ];
 
         try {
           await DatabaseService.saveChatMessage(
-            budMessage,
+            savedMessage,
             mood: detectedEmotion,
           );
         } catch (error) {
