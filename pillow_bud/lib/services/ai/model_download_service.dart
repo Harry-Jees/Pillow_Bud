@@ -176,9 +176,14 @@ class ModelDownloadService {
       sink = null;
 
       final downloadedBytes = await tempFile.length();
-      if (downloadedBytes < minimumValidModelBytes) {
+      if (downloadedBytes < minimumValidModelBytes ||
+          (totalBytes > 0 && downloadedBytes != totalBytes)) {
+        final expectedSize = totalBytes > 0
+            ? '$totalBytes bytes'
+            : 'at least $minimumValidModelBytes bytes';
         throw StateError(
-          'Downloaded model is incomplete ($downloadedBytes bytes). '
+          'Downloaded model is incomplete or has an unexpected size '
+          '($downloadedBytes bytes; expected $expectedSize). '
           'The partial file was kept so the download can be resumed.',
         );
       }
