@@ -262,8 +262,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   ),
                 ],
               ),
-              child: const Center(
-                child: Text('🛏️', style: TextStyle(fontSize: 44)),
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(21),
+                  child: Image.asset(
+                    'assets/images/app_icon.png',
+                    width: 68,
+                    height: 68,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
               ),
             ),
           ),
