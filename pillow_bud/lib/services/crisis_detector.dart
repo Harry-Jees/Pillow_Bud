@@ -16,10 +16,6 @@ class CrisisDetector {
     'self harm',
     'overdose',
     'better off dead',
-    'no way out',
-    'hopeless',
-    'giving up',
-    'goodbye everyone',
     'can\'t go on',
     'cant go on',
     'end it all',
@@ -36,7 +32,7 @@ class CrisisDetector {
   /// Backwards-compatible entrypoint
   static bool detectCrisis(String message) => detect(message);
 
-  /// Detects if the message contains crisis-related keywords
+  /// Detects selected high-signal crisis phrases. This heuristic is not a risk assessment.
   static bool detect(String message) {
     final lower = message
         .toLowerCase()
