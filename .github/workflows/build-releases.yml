@@ -22,6 +22,7 @@ jobs:
   android:
     name: Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: pillow_bud
@@ -49,6 +50,7 @@ jobs:
   windows:
     name: Windows x64 portable + installer
     runs-on: windows-latest
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: pillow_bud
@@ -115,6 +117,7 @@ jobs:
           - runner: macos-15
             architecture: apple-silicon-arm64
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: pillow_bud
@@ -145,6 +148,7 @@ jobs:
   linux:
     name: Linux Debian package + AppImage
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: pillow_bud
@@ -196,6 +200,7 @@ jobs:
           exec "$HERE/usr/bin/pillow_bud" "$@"
           APPRUN
           chmod +x "$ROOT/AppRun"
+          ln -sf AppRun "$ROOT/pillow-bud"
           cat > "$ROOT/pillow-bud.desktop" <<'DESKTOP'
           [Desktop Entry]
           Type=Application
@@ -227,6 +232,7 @@ jobs:
     if: always()
     needs: [android, windows, macos, linux]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Report build status
         env:
