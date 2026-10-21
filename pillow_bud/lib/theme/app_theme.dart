@@ -125,6 +125,40 @@ class AppTheme {
           );
         }),
       ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: cardBg,
+        indicatorColor: colorScheme.primary.withValues(alpha: 0.16),
+        selectedIconTheme: IconThemeData(color: colorScheme.primary, size: 23),
+        unselectedIconTheme: IconThemeData(color: secondaryText, size: 22),
+        selectedLabelTextStyle: TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: colorScheme.primary,
+        ),
+        unselectedLabelTextStyle: TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: secondaryText,
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: isDark ? AppColors.surfaceOverlay : AppColors.textPrimaryLight,
+        contentTextStyle: TextStyle(
+          fontFamily: 'DM Sans',
+          color: isDark ? AppColors.textPrimaryDark : Colors.white,
+          fontSize: 13,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: isDark ? AppColors.surfaceOverlay : AppColors.lightSurfaceTint,
