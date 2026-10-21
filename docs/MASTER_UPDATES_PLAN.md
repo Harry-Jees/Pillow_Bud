@@ -404,3 +404,5 @@ No workflow reruns were triggered for this implementation pass. Code has been co
 - Chat submission now locks before the first asynchronous persistence step, preventing rapid duplicate sends from overlapping and corrupting the global loading indicator.
 - Added mounted checks around asynchronous generation results and reset loading state when the screen is disposed, avoiding updates to a closed screen.
 - The chat screen restores recent persisted turns into the LLM service on history load; this behavior was verified during the source audit and retained.
+
+- Follow-up audit: chat submission now waits for persisted-history loading before forming a prompt, locks repeated submissions synchronously, logs persistence failures, and saves the fallback response when generation fails. The service call bypasses cached `FutureProvider.family` results so identical user text is generated anew.
