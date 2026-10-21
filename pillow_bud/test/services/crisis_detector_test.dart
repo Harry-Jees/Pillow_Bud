@@ -17,5 +17,15 @@ void main() {
     test('matches phrase boundaries regardless of capitalization', () {
       expect(CrisisDetector.detect('I WANT TO DIE'), isTrue);
     });
+
+    test('recognizes indirect safety-risk language', () {
+      expect(CrisisDetector.detect("I can't keep myself safe"), isTrue);
+      expect(CrisisDetector.detect('I have a plan to end my life'), isTrue);
+    });
+
+    test('does not raise the crisis overlay for a standalone denial', () {
+      expect(CrisisDetector.detect("I don't want to hurt myself"), isFalse);
+      expect(CrisisDetector.detect('I am not suicidal'), isFalse);
+    });
   });
 }
