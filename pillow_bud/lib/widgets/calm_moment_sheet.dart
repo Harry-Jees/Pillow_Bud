@@ -17,11 +17,11 @@ class _CalmMomentSheetState extends State<CalmMomentSheet>
   String _phase = 'Ready when you are';
 
   static const List<Map<String, String>> _groundingSteps = [
-    {'count': '5', 'label': 'things you can see', 'icon': 'visibility_outlined'},
-    {'count': '4', 'label': 'things you can feel', 'icon': 'touch_app_outlined'},
-    {'count': '3', 'label': 'things you can hear', 'icon': 'hearing_outlined'},
-    {'count': '2', 'label': 'things you can smell', 'icon': 'air_outlined'},
-    {'count': '1', 'label': 'thing you can taste', 'icon': 'restaurant_outlined'},
+    {'count': '5', 'label': 'things you can see'},
+    {'count': '4', 'label': 'things you can feel'},
+    {'count': '3', 'label': 'things you can hear'},
+    {'count': '2', 'label': 'things you can smell'},
+    {'count': '1', 'label': 'thing you can taste'},
   ];
 
   @override
