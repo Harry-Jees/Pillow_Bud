@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:pillow_bud/theme/app_colors.dart';
 
@@ -58,6 +59,13 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       colorScheme: colorScheme,
       scaffoldBackgroundColor: scaffoldBg,
       fontFamily: 'DM Sans',
