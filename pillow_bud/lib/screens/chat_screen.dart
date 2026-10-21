@@ -323,7 +323,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'You are carrying a deep burden right now. Please know that you are not alone and free, confidential emergency support is ready 24/7:',
+              'You are carrying a deep burden right now. You deserve support. These contacts can help, and if anyone is in immediate danger in India, call 112.',
               style: TextStyle(
                 fontFamily: 'DM Sans',
                 fontSize: 13,
