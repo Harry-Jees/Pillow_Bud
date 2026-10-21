@@ -90,7 +90,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             completed ? const HomeScreen() : const OnboardingScreen(),
         transitionsBuilder: (_, animation, __, child) =>
             FadeTransition(opacity: animation, child: child),
-        transitionDuration: const Duration(milliseconds: 400),
+        transitionDuration: MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : const Duration(milliseconds: 400),
       ),
     );
   }
