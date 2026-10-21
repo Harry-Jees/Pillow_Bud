@@ -1,11 +1,11 @@
-/// Generates a distinctive, emotionally intelligent system prompt for Bud.
+/// Generates Bud's response guidance. Conversation turns are supplied separately
+/// in ChatML, so they are intentionally not duplicated in this system prompt.
 class SystemPromptGenerator {
   static String generatePrompt({
     required String userName,
     required String personalityMode,
     required String detectedEmotion,
     required double emotionIntensity,
-    required String? recentContext,
   }) {
     final basePrompt = _getBasePrompt(userName);
     final personalityGuidance = _getPersonalityGuidance(personalityMode);
@@ -14,9 +14,6 @@ class SystemPromptGenerator {
       emotionIntensity,
     );
     final safetyGuidance = _getSafetyGuidance();
-    final contextBlock = recentContext?.trim().isNotEmpty == true
-        ? recentContext!.trim()
-        : 'None';
 
     return '''
 $basePrompt
@@ -33,9 +30,6 @@ BRAND SIGNATURE:
 
 EMOTIONAL READ:
 $emotionalResponse
-
-RECENT CONTEXT:
-$contextBlock
 
 $safetyGuidance
 
