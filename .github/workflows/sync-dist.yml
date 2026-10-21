@@ -7,6 +7,10 @@ on:
         description: Successful GitHub Actions build run ID
         required: true
         default: "39589948666"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-dist.yml"
 
 permissions:
   actions: read
@@ -29,8 +33,10 @@ jobs:
       - name: Download build artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_ID: ${{ inputs.run_id }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
         run: |
+          set -euo pipefail
+          RUN_ID="${INPUT_RUN_ID:-39589948666}"
           mkdir -p /tmp/pillow-bud-artifacts dist
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --dir /tmp/pillow-bud-artifacts
           find /tmp/pillow-bud-artifacts -type f -print
