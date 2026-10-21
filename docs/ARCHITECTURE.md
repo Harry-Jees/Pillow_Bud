@@ -1,50 +1,63 @@
-# Architecture and maintenance notes
+# Architecture and maintenance reference
 
-## Application structure
+## Application layout
 
-- `lib/main.dart`: initializes storage, database, model-download state, notifications, and the root widget.
-- `lib/screens/`: onboarding, home, chat, journal, insights, profile, breathing, meditation, biometric lock, and supporting screens.
-- `lib/providers/`: Riverpod state and theme providers.
-- `lib/models/`: chat, journal, and user preference models.
-- `lib/services/llm_service.dart`: crisis-first message handling, emotion analysis, prompt assembly, and local inference.
-- `lib/services/ai/`: model download and native GGUF inference.
-- `lib/services/database/`: SQLite persistence.
-- `lib/services/encryption/`: secure key storage and encrypted record handling.
-- `lib/services/backup/`: local export/import.
-- `lib/theme/` and `lib/widgets/`: visual system and reusable components.
+The Flutter project lives in `pillow_bud/`. Run all Flutter and Dart commands from that directory.
 
-## AI flow
+- `lib/main.dart` — app initialization and root widget.
+- `lib/screens/` — onboarding, home, chat, journal, insights, profile/settings, breathing, meditation, and splash screens.
+- `lib/providers/` — Riverpod state and theme providers.
+- `lib/models/` — chat, journal, and preference models.
+- `lib/services/llm_service.dart` — crisis-first message handling, emotion analysis, prompt assembly, response cleanup, and conversation context.
+- `lib/services/system_prompt_generator.dart` — Bud persona, response style, emotional-support approach, and safety boundaries.
+- `lib/services/ai/` — local model download and GGUF inference.
+- `lib/services/crisis_detector.dart` — phrase-based crisis marker detection and India support-resource copy.
+- `lib/services/database/` — SQLite persistence and session/mood queries.
+- `lib/services/encryption/` — secure master-key access and encrypted record operations.
+- `lib/services/backup/` — PBv3 portable backup export/import and legacy PBv2 compatibility.
+- `lib/services/storage_service.dart` — preferences and encrypted serialized chat/journal/coping-plan payloads.
+- `lib/theme/` and `lib/widgets/` — theme, reusable UI, calm-moment tools, and visual components.
+- `test/` — unit and service-level tests.
 
-1. The user message is checked by the crisis phrase detector.
-2. Emotion and intensity are estimated using local heuristics.
-3. A personality-aware system prompt is assembled with recent in-memory conversation context.
-4. The downloaded Qwen3 4B Instruct GGUF model is loaded through `llama_cpp` on supported native targets.
-5. The result is cleaned and returned to the chat UI.
+## AI request path
 
-This is local inference, not a hosted model API. Model downloads contact Hugging Face and require network access. Model files are large and can fail due to storage, memory, or native runtime limitations.
+1. Chat input is checked by the crisis phrase detector.
+2. If a trigger is detected, the service returns crisis-resource guidance instead of calling the model.
+3. Otherwise, local emotion heuristics estimate an emotion and intensity.
+4. The system prompt is assembled with the selected personality and support guidance.
+5. The app checks for a valid downloaded GGUF file and loads Qwen3 4B Instruct through `llama_cpp` on supported native platforms.
+6. Generation uses a bounded context and sampling settings configured in `LocalLLMEngine`; the response is cleaned before being displayed.
+7. Conversation-history revisions guard against stale in-flight responses repopulating context after a reset or session switch.
 
-## Data and encryption
+The exact model download source and model filename are defined in `lib/services/ai/model_download_service.dart`. Model download requires internet access and sufficient storage. Native inference can fail because of memory, file, plugin, or platform limitations. Web is not supported.
 
-- The master key must be read from OS secure storage. Failure is fatal for encryption; never replace it with a compiled-in default.
-- New database text records use AES-256-CBC plus HMAC-SHA256 encrypt-then-MAC authentication. The IV field stores `base64(iv).hex(mac)`.
-- Existing IV-only records are supported for compatibility but are unauthenticated. Add a carefully tested migration before removing this compatibility path.
-- New mood labels are encrypted in database writes; legacy labels may remain plaintext until rewritten.
-- `StorageService` stores ordinary preferences in SharedPreferences and encrypts serialized chat/journal payloads before saving them there. Legacy plaintext payloads are re-encrypted when read. This duplicate persistence path should eventually be consolidated.
-- Backup export is Base64-encoded JSON, not encryption. New backups include a key fingerprint and are only restorable with the same installation key. Portable passphrase-protected backups remain outstanding.
+## Persistence and encryption
 
-## Platform support
+- SQLite stores chat messages, journal entries, preferences, and mood logs.
+- New sensitive record fields use AES-256-CBC plus HMAC-SHA256 authentication. The IV column stores the Base64 IV and authentication tag together.
+- Legacy IV-only encrypted fields remain readable for compatibility; these records are not authenticated. Migration behavior must be preserved and tested before changing the format.
+- New mood labels are encrypted. Legacy plaintext values may remain until rewritten or migrated.
+- SharedPreferences also stores serialized chat and journal payloads encrypted with the initialized encryption service, as well as the coping plan. This duplicates some data stored in SQLite; consolidating to one authoritative repository is still outstanding.
+- The master key must be obtained from OS secure storage. Failure should stop protected operations rather than silently use a hardcoded key.
+- PBv3 exports the logical archive inside a passphrase-protected encrypted envelope. It derives separate encryption and MAC keys with PBKDF2-HMAC-SHA256, encrypts with AES-CBC, and verifies HMAC-SHA256 before decryption. Portable import re-encrypts records using the destination installation's key.
+- Legacy PBv2 import remains installation-bound and depends on the original key. Do not remove it without a migration plan and compatibility tests.
 
-The native Flutter targets are the intended scope, subject to each plugin's supported platforms. The local inference engine explicitly rejects Web. Do not claim Web support without removing or isolating native-only dependencies and testing the complete app in a browser.
+These details describe the implementation, not a claim of independent security certification. See [SECURITY.md](../SECURITY.md).
 
-## Local verification
+## UI and accessibility
 
-Run commands from `pillow_bud/`:
+The UI uses Material 3 theming, a floating translucent mobile navigation treatment, animated screen transitions, and a splash-logo reveal with haptic feedback where supported. Reduced-motion settings should be respected. Check keyboard navigation, semantic labels, contrast, text scaling, and platform-specific behavior during manual testing.
+
+## Verification
+
+Follow [TESTING.md](TESTING.md) for commands and manual checks. At minimum, run:
 
 ```bash
+cd pillow_bud
 flutter pub get
-dart format lib test
+dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
 ```
 
-Build and smoke-test each target separately. Release Android signing requires a private `android/key.properties` file and an upload keystore that must never be committed.
+Then build and smoke-test each supported native target using its platform toolchain. Never record a build or test as passed unless it was actually executed. Android release builds need a private signing setup that must not be committed.
