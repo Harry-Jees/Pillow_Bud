@@ -15,11 +15,13 @@ class LLMService {
   static const uuid = Uuid();
 
   final List<Map<String, String>> conversationHistory = [];
+  int _historyRevision = 0;
 
   /// Restores recent persisted turns so Bud retains context after app restart.
   void restoreConversationHistory(
     Iterable<Map<String, String>> turns,
   ) {
+    _historyRevision++;
     conversationHistory
       ..clear()
       ..addAll(
@@ -41,7 +43,10 @@ class LLMService {
   }
 
   /// Clears in-memory context when the user starts a fresh conversation.
-  void clearConversationHistory() => conversationHistory.clear();
+  void clearConversationHistory() {
+    _historyRevision++;
+    conversationHistory.clear();
+  }
 
   /// Processes [userMessage] through the on-device model and returns
   /// Bud's response string.
@@ -50,6 +55,7 @@ class LLMService {
     required String userName,
     required String personalityMode,
   }) async {
+    final historyRevision = _historyRevision;
     // 1. Safety & Crisis Emergency Tier
     if (CrisisDetector.detectCrisis(userMessage)) {
       return CrisisDetector.getCrisisResourceMessage();
@@ -105,12 +111,15 @@ class LLMService {
           'enough available memory.';
     }
 
-    // 7. Store conversation turn for continuous contextual memory
-    conversationHistory.add({'role': 'user', 'content': userMessage});
-    conversationHistory.add({'role': 'assistant', 'content': response});
+    // Do not let an in-flight response from an old session repopulate
+    // context after the user has switched or cleared conversations.
+    if (_historyRevision == historyRevision) {
+      conversationHistory.add({'role': 'user', 'content': userMessage});
+      conversationHistory.add({'role': 'assistant', 'content': response});
 
-    if (conversationHistory.length > 24) {
-      conversationHistory.removeRange(0, 2);
+      if (conversationHistory.length > 24) {
+        conversationHistory.removeRange(0, 2);
+      }
     }
 
     return response;
@@ -122,6 +131,7 @@ class LLMService {
     required String userName,
     required String personalityMode,
   }) async* {
+    final historyRevision = _historyRevision;
     if (CrisisDetector.detectCrisis(userMessage)) {
       yield CrisisDetector.getCrisisResourceMessage();
       return;
@@ -162,7 +172,7 @@ class LLMService {
       }
 
       final full = _cleanModelOutput(buffer.toString());
-      if (full.isNotEmpty) {
+      if (full.isNotEmpty && _historyRevision == historyRevision) {
         conversationHistory.add({'role': 'user', 'content': userMessage});
         conversationHistory.add({'role': 'assistant', 'content': full});
         if (conversationHistory.length > 24) {
