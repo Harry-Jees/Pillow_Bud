@@ -14,7 +14,6 @@ class CrisisDetector {
     'hurt myself',
     'self-harm',
     'self harm',
-    'cutting',
     'overdose',
     'better off dead',
     'no way out',
