@@ -129,10 +129,17 @@ class BackupService {
       );
     }
 
+    // Validate the entire archive structure before writing any rows. Without
+    // this preflight, a malformed later table could leave an accidental partial
+    // restore even when the file is rejected.
+    final chatRows = _validatedRows(data, 'chat_messages');
+    final journalRows = _validatedRows(data, 'journal_entries');
+    final moodRows = _validatedRows(data, 'mood_logs');
+
     int chats = 0, journals = 0, moods = 0;
     int skippedChats = 0, skippedJournals = 0, skippedMoods = 0;
 
-    for (final row in (data['chat_messages'] as List<dynamic>? ?? [])) {
+    for (final row in chatRows) {
       try {
         await DatabaseService.insertRawRow(
           table: 'chat_messages',
@@ -145,7 +152,7 @@ class BackupService {
       }
     }
 
-    for (final row in (data['journal_entries'] as List<dynamic>? ?? [])) {
+    for (final row in journalRows) {
       try {
         await DatabaseService.insertRawRow(
           table: 'journal_entries',
@@ -158,7 +165,7 @@ class BackupService {
       }
     }
 
-    for (final row in (data['mood_logs'] as List<dynamic>? ?? [])) {
+    for (final row in moodRows) {
       try {
         await DatabaseService.insertRawRow(
           table: 'mood_logs',
@@ -182,6 +189,35 @@ class BackupService {
       skippedJournals: skippedJournals,
       skippedMoods: skippedMoods,
     );
+  }
+
+  static List<Map<String, dynamic>> _validatedRows(
+    Map<String, dynamic> data,
+    String key,
+  ) {
+    final value = data[key];
+    if (value == null) return <Map<String, dynamic>>[];
+    if (value is! List) {
+      throw FormatException('Backup field "$key" must be a list.');
+    }
+
+    final rows = <Map<String, dynamic>>[];
+    for (var index = 0; index < value.length; index++) {
+      final row = value[index];
+      if (row is! Map) {
+        throw FormatException(
+          'Backup field "$key" contains an invalid record at index $index.',
+        );
+      }
+      try {
+        rows.add(Map<String, dynamic>.from(row));
+      } catch (_) {
+        throw FormatException(
+          'Backup field "$key" contains an invalid record at index $index.',
+        );
+      }
+    }
+    return rows;
   }
 }
 
