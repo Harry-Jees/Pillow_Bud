@@ -191,7 +191,7 @@ class DatabaseService {
       final messages = await getAllChatMessages(sessionId: id);
       final firstUser = messages.where((message) => !message.isFromBud);
       final firstText = firstUser.isEmpty ? 'Quiet conversation' : firstUser.first.text;
-      final title = firstText.replaceAll(RegExp(r'\\s+'), ' ').trim();
+      final title = firstText.replaceAll(RegExp(r'\s+'), ' ').trim();
       sessions.add({
         'id': id,
         'title': title.isEmpty
