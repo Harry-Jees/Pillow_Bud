@@ -392,7 +392,7 @@ class DatabaseService {
           );
 
     // Authenticated records already use the IV-plus-MAC format.
-    if (hasIv && ivValue!.contains('.')) return plaintext;
+    if (hasIv && ivValue.contains('.')) return plaintext;
 
     final upgraded = await EncryptionService.encrypt(plaintext);
     await _db!.update(
