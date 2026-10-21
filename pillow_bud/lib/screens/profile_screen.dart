@@ -1480,7 +1480,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           size: 18, color: AppColors.success),
                       const SizedBox(width: 8),
                       Text(
-                        '100% Private, Local & Cross-Platform',
+                        'Local-first privacy',
                         style: TextStyle(
                           fontFamily: 'DM Sans',
                           fontSize: 13,
@@ -1494,7 +1494,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Built with Material 3 for Android, iOS, Windows, macOS, Linux, and Web. Zero analytics trackers and zero third-party cloud uploads.',
+                    'Chat inference is designed to run on your device after the model is downloaded. Internet access is needed for model downloads, and platform support depends on native plugin and toolchain compatibility. Pillow Bud is not a medical or emergency service.',
                     style: TextStyle(
                       fontFamily: 'DM Sans',
                       fontSize: 12,
