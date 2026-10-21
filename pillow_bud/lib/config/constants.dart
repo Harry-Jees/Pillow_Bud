@@ -13,7 +13,6 @@ class Constants {
   // Crisis Trigger Phrases
   static const List<String> crisisTriggers = [
     'kill myself',
-    'kill me',
     'end my life',
     'suicide',
     'overdose',
