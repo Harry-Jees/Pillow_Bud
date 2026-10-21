@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pillow_bud/models/chat_message.dart';
 import 'package:pillow_bud/models/journal_entry.dart';
 import 'package:pillow_bud/models/user_preference.dart';
+import 'package:pillow_bud/services/database/database_service.dart';
 
 // User State
 final userNameProvider = StateProvider<String>((ref) => '');
@@ -32,3 +33,8 @@ final isDarkModeProvider = StateProvider<bool>((ref) => true);
 final isModelLoadingProvider = StateProvider<bool>((ref) => false);
 
 final modelLoadingProgressProvider = StateProvider<double>((ref) => 1.0);
+
+/// Decrypted, recent mood check-ins for real trend summaries and insights.
+final moodHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) {
+  return DatabaseService.getMoodHistory();
+});
