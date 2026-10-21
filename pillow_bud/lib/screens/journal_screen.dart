@@ -447,7 +447,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                           tween: Tween(begin: 0.97, end: 1.0),
                           duration: MediaQuery.maybeOf(context)?.disableAnimations == true
                               ? Duration.zero
-                              : Duration(milliseconds: 180 + (index.clamp(0, 6) * 25)),
+                              : Duration(milliseconds: 180 + (index.clamp(0, 6).toInt() * 25)),
                           curve: Curves.easeOutCubic,
                           builder: (context, scale, child) => Transform.scale(
                             scale: scale,
